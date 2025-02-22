@@ -17,8 +17,11 @@ make run
 
 ## Todo
 
+- multi tile selection
 - randomly place tiles from multi selection
 - scroll tile UI
 - bucket tool
 - scale slider
 - adjustable map size
+- UI panels draggable
+- debug UI on right

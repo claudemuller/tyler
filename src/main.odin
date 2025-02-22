@@ -10,13 +10,14 @@ WINDOW_HEIGHT :: 1080
 WORLD_WIDTH :: 1920 * 2
 WORLD_HEIGHT :: 1080 * 2
 
-BLOCK_SIZE :: 32
-BLOCKS_IN_ROW :: WORLD_WIDTH / BLOCK_SIZE
-BLOCKS_IN_COL :: WORLD_HEIGHT / BLOCK_SIZE
+// BLOCK_SIZE :: 32
+// BLOCKS_IN_ROW :: WORLD_WIDTH / BLOCK_SIZE
+// BLOCKS_IN_COL :: WORLD_HEIGHT / BLOCK_SIZE
 
 camera: rl.Camera2D
 input: Input
-blocks := make(map[u16]Tile, BLOCKS_IN_ROW * BLOCKS_IN_COL)
+blocks: map[u16]Tile
+block_size: i32
 
 main :: proc() {
 	track: mem.Tracking_Allocator
@@ -64,9 +65,8 @@ update :: proc() {
 	// Remove a tile
 	if .RIGHT in input.mouse.btns {
 		world_mouse_pos := rl.GetScreenToWorld2D(input.mouse.px_pos, camera)
-		x := i32(world_mouse_pos.x / BLOCK_SIZE)
-		y := i32(world_mouse_pos.y / BLOCK_SIZE)
-		// TODO:(lukefilewalker) we have collisions!!!!
+		x := i32(world_mouse_pos.x) / block_size
+		y := i32(world_mouse_pos.y) / block_size
 		hash := gen_hash(x, y)
 
 		delete_key(&blocks, hash)
@@ -75,22 +75,14 @@ update :: proc() {
 	// Place a tile
 	if selection.selected && .LEFT in input.mouse.btns {
 		world_mouse_pos := rl.GetScreenToWorld2D(input.mouse.px_pos, camera)
-		x := i32(world_mouse_pos.x / BLOCK_SIZE)
-		y := i32(world_mouse_pos.y / BLOCK_SIZE)
-		// TODO:(lukefilewalker) we have collisions!!!!
+		x := i32(world_mouse_pos.x) / block_size
+		y := i32(world_mouse_pos.y) / block_size
 		hash := gen_hash(x, y)
 
 		tile := selection.tile
 
-		// If there is already a tile
-		// if cur_tile, exists := blocks[hash]; exists {
-		// 	if cur_tile.src_rec == tile.src_rec {
-		// 		return
-		// 	}
-		// }
-
-		tile.dst_rec.x = f32(x) * BLOCK_SIZE
-		tile.dst_rec.y = f32(y) * BLOCK_SIZE
+		tile.dst_rec.x = f32(x * block_size)
+		tile.dst_rec.y = f32(y * block_size)
 
 		blocks[hash] = tile
 	}
@@ -128,15 +120,17 @@ render :: proc() {
 	}
 
 	// Draw grid
-	for y in i32(0) ..< BLOCKS_IN_COL {
-		for x in i32(0) ..< BLOCKS_IN_ROW {
-			rl.DrawRectangleLines(
-				x * BLOCK_SIZE,
-				y * BLOCK_SIZE,
-				BLOCK_SIZE,
-				BLOCK_SIZE,
-				{30, 30, 30, 255},
-			)
+	if block_size > 0 {
+		for y in i32(0) ..< WORLD_HEIGHT / block_size {
+			for x in i32(0) ..< WORLD_WIDTH / block_size {
+				rl.DrawRectangleLines(
+					x * block_size * i32(scale),
+					y * block_size * i32(scale),
+					block_size * i32(scale),
+					block_size * i32(scale),
+					{30, 30, 30, 255},
+				)
+			}
 		}
 	}
 

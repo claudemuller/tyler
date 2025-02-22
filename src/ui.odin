@@ -45,6 +45,12 @@ Tile :: struct {
 	},
 }
 
+Map :: struct {
+	scale:     f32,
+	tilesheet: cstring,
+	tiles:     map[u16]Tile,
+}
+
 Selection :: struct {
 	selected: bool,
 	tile:     Tile,
@@ -58,6 +64,7 @@ panel_tiles_in_row: i32 = 10
 selection: Selection
 hovering_tile: rl.Rectangle
 scroll_offset: f32
+tilesheet: cstring
 
 ui_setup :: proc() {
 	rl.GuiLoadStyle("res/style_dark.rgs")
@@ -77,35 +84,40 @@ ui_setup :: proc() {
 	// Debug
 	scale = 2
 	// load_tiles("assets/tilesheets/colored_packed.png", 16, 16, &texture)
-	load_tiles("../that-guy/res/assets/tilemap.png", 16, 16, &texture)
+	// load_tiles("../that-guy/res/assets/tilemap.png", 16, 16, &texture)
 	// _Debug
 
 	append(&main_panel.items, Item{label = "Scale", type = .Slider, value = &scale})
-	append(&main_panel.items, Item {
-		label = "Load spritesheet",
-		type = .Button,
-		height = BTN_HEIGHT,
-		callback = proc() {
-			ret := tfd.inputBox("Tile width and height", "in pixels", "")
-			if ret == "" {
-				return
-			}
-			tile_width := f32(strconv.atof(string(ret)))
-			tile_height := tile_width
+	append(
+		&main_panel.items,
+		Item {
+			label = "Load spritesheet",
+			type = .Button,
+			height = BTN_HEIGHT,
+			callback = proc() {
+				ret := tfd.inputBox("Tile width and height", "in pixels", "")
+				if ret == "" {
+					return
+				}
+				tile_width := f32(strconv.atof(string(ret)))
+				// TODO:(lukefilewalker) this isn't the best place :(
+				block_size = i32(tile_width)
+				tile_height := tile_width
 
-			fname := tfd.openFileDialog(
-				"Open file",
-				nil,
-				2,
-				raw_data([]cstring{"*.png", "*.txt"}),
-				nil,
-				0,
-			)
-			if fname != "" {
-				load_tiles(fname, tile_width, tile_height, &texture)
-			}
+				tilesheet = tfd.openFileDialog(
+					"Open file",
+					nil,
+					2,
+					raw_data([]cstring{"*.png", "*.txt"}),
+					nil,
+					0,
+				)
+				if tilesheet != "" {
+					load_tiles(tilesheet, tile_width, tile_height, &texture)
+				}
+			},
 		},
-	})
+	)
 
 	append(&main_panel.items, Item {
 		label = "Save tilemap",
@@ -129,11 +141,17 @@ ui_setup :: proc() {
 }
 
 save_tilemap :: proc(fname: cstring) -> bool {
-	data, err := json.marshal(blocks)
+	map_data := Map {
+		scale     = scale,
+		tilesheet = tilesheet,
+		tiles     = blocks,
+	}
+	data, err := json.marshal(map_data, allocator = context.temp_allocator)
 	if err != nil {
 		rl.TraceLog(.ERROR, fmt.ctprintf("Error marshalling tilemap to json: %v", err))
 		return false
 	}
+	defer free_all(context.temp_allocator)
 
 	return os.write_entire_file(string(fname), data)
 }
@@ -144,8 +162,6 @@ load_tiles :: proc(fname: cstring, tile_width, tile_height: f32, tex: ^rl.Textur
 	num_tiles_in_row := texture.width / i32(tile_width)
 	num_tiles_in_col := texture.height / i32(tile_height)
 	num_tile_cols := num_tiles_in_row * num_tiles_in_col / panel_tiles_in_row + 1
-
-	fmt.printfln("%v %v ", num_tiles_in_col, num_tiles_in_row)
 
 	main_panel.internal_width = tile_width * scale * f32(panel_tiles_in_row)
 	main_panel.rect.width = main_panel.internal_width + main_panel.padding * 2
