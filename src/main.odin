@@ -57,7 +57,7 @@ setup :: proc() {
 }
 
 update :: proc() {
-	camera.offset += input.kb.axis
+	// camera.offset += input.kb.axis
 
 	if .LEFT in input.mouse.btns {
 		world_mouse_pos := rl.GetScreenToWorld2D(input.mouse.px_pos, camera)

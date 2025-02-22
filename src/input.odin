@@ -46,7 +46,8 @@ process_input :: proc() {
 	input.mouse.px_pos = rl.GetMousePosition()
 
 	input.mouse.btns = {}
-	if rl.IsMouseButtonPressed(.LEFT) do input.mouse.btns += {.LEFT}
+	if rl.IsMouseButtonDown(.LEFT) do input.mouse.btns += {.LEFT}
+	if rl.IsMouseButtonUp(.LEFT) do input.mouse.btns -= {.LEFT}
 	if rl.IsMouseButtonPressed(.MIDDLE) do input.mouse.btns += {.MIDDLE}
 	if rl.IsMouseButtonPressed(.RIGHT) do input.mouse.btns += {.RIGHT}
 

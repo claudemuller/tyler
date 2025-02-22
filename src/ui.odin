@@ -148,8 +148,6 @@ load_tiles :: proc(fname: cstring, tile_width, tile_height: f32, tex: ^rl.Textur
 }
 
 ui_update :: proc() {
-	tiles_x := input.mouse.px_pos
-
 	// TODO:(lukefilewalker) don't have to loop each tile - convert MouseButton-pos to grid and check tile there
 	for t, i in tiles {
 		if rl.CheckCollisionPointRec(rl.GetMousePosition(), t.dst_rec) {
