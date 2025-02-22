@@ -67,7 +67,7 @@ update :: proc() {
 		x := i32(world_mouse_pos.x / BLOCK_SIZE)
 		y := i32(world_mouse_pos.y / BLOCK_SIZE)
 		// TODO:(lukefilewalker) we have collisions!!!!
-		hash := u16(x * y)
+		hash := gen_hash(x, y)
 
 		delete_key(&blocks, hash)
 	}
@@ -78,7 +78,7 @@ update :: proc() {
 		x := i32(world_mouse_pos.x / BLOCK_SIZE)
 		y := i32(world_mouse_pos.y / BLOCK_SIZE)
 		// TODO:(lukefilewalker) we have collisions!!!!
-		hash := u16(x * y)
+		hash := gen_hash(x, y)
 
 		tile := selection.tile
 
@@ -161,4 +161,8 @@ clamp_camera :: proc(vec: rl.Vector2) -> rl.Vector2 {
 	if (res_vec.y > maxY) do res_vec.y = maxY
 
 	return res_vec
+}
+
+gen_hash :: proc(x, y: i32) -> u16 {
+	return u16(((x * 73856093) + (y * 19349663)) % 65536)
 }

@@ -17,6 +17,7 @@ make run
 
 ## Todo
 
+- randomly place tiles from multi selection
 - scroll tile UI
 - bucket tool
 - scale slider
