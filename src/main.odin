@@ -107,6 +107,8 @@ update :: proc() {
 
 		delta := cur_mouse_pos - input.mouse.prev_px_pos
 		camera.offset += delta * MOUSE_PAN_SPEED
+		// TODO:(lukefilewalker) clamp properly here
+		camera.offset = clamp_camera(camera.offset)
 
 		input.mouse.prev_px_pos = cur_mouse_pos
 	} else {

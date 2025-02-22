@@ -1,6 +1,7 @@
 package adventure
 
 import tfd "../vendor/tinyfiledialogs"
+import "core:encoding/json"
 import "core:fmt"
 import "core:os"
 import "core:strconv"
@@ -59,7 +60,7 @@ hovering_tile: rl.Rectangle
 scroll_offset: f32
 
 ui_setup :: proc() {
-	rl.GuiLoadStyle("assets/style_dark.rgs")
+	rl.GuiLoadStyle("res/style_dark.rgs")
 
 	x: f32 = 20.0
 	y: f32 = 20.0
@@ -93,7 +94,7 @@ ui_setup :: proc() {
 			tile_height := tile_width
 
 			fname := tfd.openFileDialog(
-				"Open File",
+				"Open file",
 				nil,
 				2,
 				raw_data([]cstring{"*.png", "*.txt"}),
@@ -105,6 +106,36 @@ ui_setup :: proc() {
 			}
 		},
 	})
+
+	append(&main_panel.items, Item {
+		label = "Save tilemap",
+		type = .Button,
+		height = BTN_HEIGHT,
+		callback = proc() {
+			fname := tfd.saveFileDialog(
+				"Save as",
+				nil,
+				2,
+				raw_data([]cstring{"*.json", "*.txt"}),
+				nil,
+			)
+			if fname != "" {
+				if ok := save_tilemap(fname); !ok {
+					rl.TraceLog(.ERROR, "Error writing tilemap to disk")
+				}
+			}
+		},
+	})
+}
+
+save_tilemap :: proc(fname: cstring) -> bool {
+	data, err := json.marshal(blocks)
+	if err != nil {
+		rl.TraceLog(.ERROR, fmt.ctprintf("Error marshalling tilemap to json: %v", err))
+		return false
+	}
+
+	return os.write_entire_file(string(fname), data)
 }
 
 load_tiles :: proc(fname: cstring, tile_width, tile_height: f32, tex: ^rl.Texture2D) {
@@ -121,13 +152,13 @@ load_tiles :: proc(fname: cstring, tile_width, tile_height: f32, tex: ^rl.Textur
 	// TODO:(lukefilewalker) dynamically add height of items already in panel
 	// TODO:(lukefilewalker) magic number
 	main_panel.rect.height =
-		f32(num_tile_cols) * tile_height * scale + f32(len(main_panel.items)) + 120
+		f32(num_tile_cols) * tile_height * scale + f32(len(main_panel.items)) + 140
 
 	tiles = make([dynamic]Tile, num_tiles_in_row * num_tiles_in_col)
 
 	xstart := main_panel.content_start_left
 	// TODO:(lukefilewalker) magic number
-	ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 3)
+	ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
 
 	i: i32
 	for y in 0 ..< num_tiles_in_col {
@@ -289,15 +320,6 @@ ui_draw :: proc() {
 		// Draw hovering tile
 		rl.DrawRectangleLinesEx(hovering_tile, 3, rl.RED)
 	}
-
-	// ret := tfd.saveFileDialog(
-	// 	"Save File Dialog",
-	// 	nil,
-	// 	2,
-	// 	raw_data([]cstring{"*.png", "*.txt"}),
-	// 	nil,
-	// )
-	// fmt.printfln("You saved to this file: %s", ret)
 
 	ui_draw_debug()
 }
