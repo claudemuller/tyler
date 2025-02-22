@@ -16,7 +16,7 @@ BLOCKS_IN_COL :: WORLD_HEIGHT / BLOCK_SIZE
 
 camera: rl.Camera2D
 input: Input
-blocks: [BLOCKS_IN_ROW * BLOCKS_IN_COL]u8
+blocks: [dynamic]Tile
 
 main :: proc() {
 	track: mem.Tracking_Allocator
@@ -54,17 +54,20 @@ setup :: proc() {
 		offset = {WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2},
 		zoom   = 1,
 	}
-
-	for y in i32(0) ..< BLOCKS_IN_COL {
-		for x in i32(0) ..< BLOCKS_IN_ROW {
-			idx := y * BLOCKS_IN_ROW + x
-			blocks[idx] = 1
-		}
-	}
 }
 
 update :: proc() {
 	camera.offset += input.kb.axis
+
+	if .LEFT in input.mouse.btns {
+		world_mouse_pos := rl.GetScreenToWorld2D(input.mouse.px_pos, camera)
+		x := i32(world_mouse_pos.x / BLOCK_SIZE)
+		y := i32(world_mouse_pos.y / BLOCK_SIZE)
+		tile := selected_tile
+		tile.dst_rec.x = f32(x) * BLOCK_SIZE
+		tile.dst_rec.y = f32(y) * BLOCK_SIZE
+		append(&blocks, tile)
+	}
 
 	ui_update()
 }
@@ -75,13 +78,21 @@ render :: proc() {
 
 	rl.BeginMode2D(camera)
 
+	// Draw tiles
+	for tile in blocks {
+		rl.DrawTexturePro(texture, tile.src_rec, tile.dst_rec, {0, 0}, 0, rl.WHITE)
+	}
+
+	// Draw grid
 	for y in i32(0) ..< BLOCKS_IN_COL {
 		for x in i32(0) ..< BLOCKS_IN_ROW {
-			// Calculate block pixel position
-			block_px := x * BLOCK_SIZE
-			block_py := y * BLOCK_SIZE
-
-			rl.DrawRectangleLines(block_px, block_py, BLOCK_SIZE, BLOCK_SIZE, {30, 30, 30, 255})
+			rl.DrawRectangleLines(
+				x * BLOCK_SIZE,
+				y * BLOCK_SIZE,
+				BLOCK_SIZE,
+				BLOCK_SIZE,
+				{30, 30, 30, 255},
+			)
 		}
 	}
 
