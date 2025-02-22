@@ -95,6 +95,23 @@ update :: proc() {
 		blocks[hash] = tile
 	}
 
+	cur_mouse_pos := rl.Vector2 {
+		(input.mouse.px_pos.x / WORLD_WIDTH) * 2 - 1,
+		(input.mouse.px_pos.y / WORLD_HEIGHT) * 2 - 1,
+	}
+	if .MIDDLE in input.mouse.btns {
+		if !input.mouse.is_panning {
+			input.mouse.prev_px_pos = cur_mouse_pos
+			input.mouse.is_panning = true
+		}
+
+		delta := cur_mouse_pos - input.mouse.prev_px_pos
+		camera.offset += delta * MOUSE_PAN_SPEED
+
+		input.mouse.prev_px_pos = cur_mouse_pos
+	} else {
+		input.mouse.is_panning = false
+	}
 }
 
 render :: proc() {

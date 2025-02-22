@@ -3,6 +3,7 @@ package adventure
 import rl "vendor:raylib"
 
 MOUSE_SCROLL_SPEED :: 3
+MOUSE_PAN_SPEED :: 500
 
 MouseButton :: enum {
 	LEFT,
@@ -38,8 +39,10 @@ Input :: struct {
 	mouse:   struct {
 		pos:         rl.Vector2,
 		px_pos:      rl.Vector2, // This is in camera/screen space
+		prev_px_pos: rl.Vector2, // This is in camera/screen space
 		btns:        bit_set[MouseButton],
 		wheel_delta: f32,
+		is_panning:  bool,
 	},
 }
 
@@ -53,7 +56,8 @@ process_input :: proc() {
 	if rl.IsMouseButtonUp(.LEFT) do input.mouse.btns -= {.LEFT}
 	if rl.IsMouseButtonDown(.RIGHT) do input.mouse.btns += {.RIGHT}
 	if rl.IsMouseButtonUp(.RIGHT) do input.mouse.btns -= {.RIGHT}
-	if rl.IsMouseButtonPressed(.MIDDLE) do input.mouse.btns += {.MIDDLE}
+	if rl.IsMouseButtonDown(.MIDDLE) do input.mouse.btns += {.MIDDLE}
+	if rl.IsMouseButtonUp(.MIDDLE) do input.mouse.btns -= {.MIDDLE}
 
 	input.gamepad.laxis.x = rl.GetGamepadAxisMovement(0, .LEFT_X)
 	input.gamepad.laxis.y = rl.GetGamepadAxisMovement(0, .LEFT_Y)
