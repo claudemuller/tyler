@@ -59,17 +59,18 @@ setup :: proc() {
 update :: proc() {
 	// camera.offset += input.kb.axis
 
-	if .LEFT in input.mouse.btns {
+	if ui_update() do return
+
+	if selection.selected && .LEFT in input.mouse.btns {
 		world_mouse_pos := rl.GetScreenToWorld2D(input.mouse.px_pos, camera)
 		x := i32(world_mouse_pos.x / BLOCK_SIZE)
 		y := i32(world_mouse_pos.y / BLOCK_SIZE)
-		tile := selected_tile
+		tile := selection.tile
 		tile.dst_rec.x = f32(x) * BLOCK_SIZE
 		tile.dst_rec.y = f32(y) * BLOCK_SIZE
 		append(&blocks, tile)
 	}
 
-	ui_update()
 }
 
 render :: proc() {

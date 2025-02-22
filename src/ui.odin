@@ -44,12 +44,17 @@ Tile :: struct {
 	},
 }
 
+Selection :: struct {
+	selected: bool,
+	tile:     Tile,
+}
+
 main_panel: Panel
 texture: rl.Texture2D
 tiles: [dynamic]Tile
 scale: f32 = 1.0
 panel_tiles_in_row: i32 = 10
-selected_tile: Tile
+selection: Selection
 hovering_tile: rl.Rectangle
 
 ui_setup :: proc() {
@@ -147,17 +152,26 @@ load_tiles :: proc(fname: cstring, tile_width, tile_height: f32, tex: ^rl.Textur
 	}
 }
 
-ui_update :: proc() {
+ui_update :: proc() -> bool {
+	if !rl.CheckCollisionPointRec(input.mouse.px_pos, main_panel.rect) {
+		return false
+	}
+
 	// TODO:(lukefilewalker) don't have to loop each tile - convert MouseButton-pos to grid and check tile there
 	for t, i in tiles {
-		if rl.CheckCollisionPointRec(rl.GetMousePosition(), t.dst_rec) {
+		if rl.CheckCollisionPointRec(input.mouse.px_pos, t.dst_rec) {
 			hovering_tile = t.dst_rec
 
 			if .LEFT in input.mouse.btns {
-				selected_tile = t
+				selection = {
+					tile     = t,
+					selected = true,
+				}
 			}
 		}
 	}
+
+	return true
 }
 
 ui_draw :: proc() {
@@ -235,10 +249,10 @@ ui_draw :: proc() {
 		dst := rl.Rectangle {
 			input.mouse.px_pos.x,
 			input.mouse.px_pos.y,
-			selected_tile.dst_rec.width,
-			selected_tile.dst_rec.height,
+			selection.tile.dst_rec.width,
+			selection.tile.dst_rec.height,
 		}
-		rl.DrawTexturePro(texture, selected_tile.src_rec, dst, {0, 0}, 0, rl.WHITE)
+		rl.DrawTexturePro(texture, selection.tile.src_rec, dst, {0, 0}, 0, rl.WHITE)
 
 		// Draw hovering tile
 		rl.DrawRectangleLinesEx(hovering_tile, 3, rl.RED)
@@ -252,6 +266,12 @@ ui_draw :: proc() {
 	// 	nil,
 	// )
 	// fmt.printfln("You saved to this file: %s", ret)
+
+	ui_draw_debug()
+}
+
+ui_draw_debug :: proc() {
+	rl.DrawText(fmt.ctprintf("num_blocks: %d", len(blocks)), 400, 10, 20, rl.LIGHTGRAY)
 }
 
 y_pos :: proc(y_from_top: f32, n: int) -> f32 {
