@@ -16,7 +16,7 @@ BLOCKS_IN_COL :: WORLD_HEIGHT / BLOCK_SIZE
 
 camera: rl.Camera2D
 input: Input
-blocks: [dynamic]Tile
+blocks := make(map[u16]Tile, BLOCKS_IN_ROW * BLOCKS_IN_COL)
 
 main :: proc() {
 	track: mem.Tracking_Allocator
@@ -65,10 +65,22 @@ update :: proc() {
 		world_mouse_pos := rl.GetScreenToWorld2D(input.mouse.px_pos, camera)
 		x := i32(world_mouse_pos.x / BLOCK_SIZE)
 		y := i32(world_mouse_pos.y / BLOCK_SIZE)
+		// TODO:(lukefilewalker) we have collisions!!!!
+		hash := u16(x * y)
+
 		tile := selection.tile
+
+		// If there is already a tile
+		// if cur_tile, exists := blocks[hash]; exists {
+		// 	if cur_tile.src_rec == tile.src_rec {
+		// 		return
+		// 	}
+		// }
+
 		tile.dst_rec.x = f32(x) * BLOCK_SIZE
 		tile.dst_rec.y = f32(y) * BLOCK_SIZE
-		append(&blocks, tile)
+
+		blocks[hash] = tile
 	}
 
 }
@@ -80,7 +92,7 @@ render :: proc() {
 	rl.BeginMode2D(camera)
 
 	// Draw tiles
-	for tile in blocks {
+	for _, tile in blocks {
 		rl.DrawTexturePro(texture, tile.src_rec, tile.dst_rec, {0, 0}, 0, rl.WHITE)
 	}
 
