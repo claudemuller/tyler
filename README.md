@@ -18,7 +18,7 @@ make run
 ## Todo
 
 - scroll tile UI
-- paint tool
+- bucket tool
 - remove placed tiles
 - drag and pan with mouse
 - scale slider

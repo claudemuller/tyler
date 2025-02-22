@@ -51,8 +51,9 @@ process_input :: proc() {
 	input.mouse.btns = {}
 	if rl.IsMouseButtonDown(.LEFT) do input.mouse.btns += {.LEFT}
 	if rl.IsMouseButtonUp(.LEFT) do input.mouse.btns -= {.LEFT}
+	if rl.IsMouseButtonDown(.RIGHT) do input.mouse.btns += {.RIGHT}
+	if rl.IsMouseButtonUp(.RIGHT) do input.mouse.btns -= {.RIGHT}
 	if rl.IsMouseButtonPressed(.MIDDLE) do input.mouse.btns += {.MIDDLE}
-	if rl.IsMouseButtonPressed(.RIGHT) do input.mouse.btns += {.RIGHT}
 
 	input.gamepad.laxis.x = rl.GetGamepadAxisMovement(0, .LEFT_X)
 	input.gamepad.laxis.y = rl.GetGamepadAxisMovement(0, .LEFT_Y)

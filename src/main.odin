@@ -61,6 +61,18 @@ update :: proc() {
 
 	if ui_update() do return
 
+	// Remove a tile
+	if .RIGHT in input.mouse.btns {
+		world_mouse_pos := rl.GetScreenToWorld2D(input.mouse.px_pos, camera)
+		x := i32(world_mouse_pos.x / BLOCK_SIZE)
+		y := i32(world_mouse_pos.y / BLOCK_SIZE)
+		// TODO:(lukefilewalker) we have collisions!!!!
+		hash := u16(x * y)
+
+		delete_key(&blocks, hash)
+	}
+
+	// Place a tile
 	if selection.selected && .LEFT in input.mouse.btns {
 		world_mouse_pos := rl.GetScreenToWorld2D(input.mouse.px_pos, camera)
 		x := i32(world_mouse_pos.x / BLOCK_SIZE)
