@@ -24,4 +24,5 @@ make run
 - scale slider
 - adjustable map size
 - UI panels draggable
+- toggle grid on/off
 - debug UI on right
