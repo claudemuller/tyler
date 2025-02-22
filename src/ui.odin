@@ -56,6 +56,7 @@ scale: f32 = 1.0
 panel_tiles_in_row: i32 = 10
 selection: Selection
 hovering_tile: rl.Rectangle
+scroll_offset: f32
 
 ui_setup :: proc() {
 	rl.GuiLoadStyle("assets/style_dark.rgs")
@@ -74,7 +75,8 @@ ui_setup :: proc() {
 
 	// Debug
 	scale = 2
-	load_tiles("assets/tilesheets/colored_packed.png", 16, 16, &texture)
+	// load_tiles("assets/tilesheets/colored_packed.png", 16, 16, &texture)
+	load_tiles("../that-guy/res/assets/tilemap.png", 16, 16, &texture)
 	// _Debug
 
 	append(&main_panel.items, Item{label = "Scale", type = .Slider, value = &scale})
@@ -110,12 +112,16 @@ load_tiles :: proc(fname: cstring, tile_width, tile_height: f32, tex: ^rl.Textur
 
 	num_tiles_in_row := texture.width / i32(tile_width)
 	num_tiles_in_col := texture.height / i32(tile_height)
-	num_tile_cols := num_tiles_in_row * num_tiles_in_col / panel_tiles_in_row
+	num_tile_cols := num_tiles_in_row * num_tiles_in_col / panel_tiles_in_row + 1
+
+	fmt.printfln("%v %v ", num_tiles_in_col, num_tiles_in_row)
 
 	main_panel.internal_width = tile_width * scale * f32(panel_tiles_in_row)
 	main_panel.rect.width = main_panel.internal_width + main_panel.padding * 2
-	// TODO:(lukefilewalker) dynamically add items already in panel
-	main_panel.rect.height = f32(num_tile_cols) * tile_height * scale + 100
+	// TODO:(lukefilewalker) dynamically add height of items already in panel
+	// TODO:(lukefilewalker) magic number
+	main_panel.rect.height =
+		f32(num_tile_cols) * tile_height * scale + f32(len(main_panel.items)) + 120
 
 	tiles = make([dynamic]Tile, num_tiles_in_row * num_tiles_in_col)
 
@@ -152,9 +158,33 @@ load_tiles :: proc(fname: cstring, tile_width, tile_height: f32, tex: ^rl.Textur
 	}
 }
 
+// TODO:(lukefilewalker) debug
+tiles_panel: rl.Rectangle
+
 ui_update :: proc() -> bool {
+	// Exit if input is not for the UI panel
 	if !rl.CheckCollisionPointRec(input.mouse.px_pos, main_panel.rect) {
 		return false
+	}
+
+	// Scroll tiles
+	if input.mouse.wheel_delta != 0 {
+		tile_width := tiles[0].dst_rec.width
+		tile_height := tiles[0].dst_rec.height
+		num_tiles_in_row := texture.width / i32(tile_width)
+		num_tiles_in_col := texture.height / i32(tile_height)
+		num_tile_cols := num_tiles_in_row * num_tiles_in_col / panel_tiles_in_row
+
+		tiles_panel = rl.Rectangle {
+			x      = tiles[0].dst_rec.x,
+			y      = tiles[0].dst_rec.y,
+			width  = tiles[0].dst_rec.width * f32(panel_tiles_in_row),
+			height = f32(num_tile_cols) * tile_height * scale + 100,
+		}
+
+		if rl.CheckCollisionPointRec(input.mouse.px_pos, tiles_panel) {
+			scroll_offset += input.mouse.wheel_delta
+		}
 	}
 
 	// TODO:(lukefilewalker) don't have to loop each tile - convert MouseButton-pos to grid and check tile there
@@ -234,7 +264,9 @@ ui_draw :: proc() {
 	if texture.id != 0 {
 		// Draw tiles
 		for t, i in tiles {
-			rl.DrawTexturePro(texture, t.src_rec, t.dst_rec, {0, 0}, 0, rl.WHITE)
+			dst := t.dst_rec
+			dst.y += scroll_offset * 10
+			rl.DrawTexturePro(texture, t.src_rec, dst, {0, 0}, 0, rl.WHITE)
 
 			rl.DrawRectangleLines(
 				i32(t.dst_rec.x),
@@ -272,6 +304,14 @@ ui_draw :: proc() {
 
 ui_draw_debug :: proc() {
 	rl.DrawText(fmt.ctprintf("num_blocks: %d", len(blocks)), 400, 10, 20, rl.LIGHTGRAY)
+
+	rl.DrawRectangleLines(
+		i32(tiles_panel.x),
+		i32(tiles_panel.y),
+		i32(tiles_panel.width),
+		i32(tiles_panel.height),
+		rl.RED,
+	)
 }
 
 y_pos :: proc(y_from_top: f32, n: int) -> f32 {

@@ -2,6 +2,8 @@ package adventure
 
 import rl "vendor:raylib"
 
+MOUSE_SCROLL_SPEED :: 3
+
 MouseButton :: enum {
 	LEFT,
 	MIDDLE,
@@ -34,15 +36,16 @@ Input :: struct {
 		btns:  bit_set[GamepadButton],
 	},
 	mouse:   struct {
-		pos:    rl.Vector2,
-		px_pos: rl.Vector2, // This is in camera/screen space
-		btns:   bit_set[MouseButton],
+		pos:         rl.Vector2,
+		px_pos:      rl.Vector2, // This is in camera/screen space
+		btns:        bit_set[MouseButton],
+		wheel_delta: f32,
 	},
 }
 
 process_input :: proc() {
-	camera.zoom += rl.GetMouseWheelMove() * 0.1
-
+	// camera.zoom += rl.GetMouseWheelMove() * 0.1
+	input.mouse.wheel_delta = rl.GetMouseWheelMove() * MOUSE_SCROLL_SPEED
 	input.mouse.px_pos = rl.GetMousePosition()
 
 	input.mouse.btns = {}
