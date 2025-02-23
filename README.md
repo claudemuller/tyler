@@ -35,3 +35,6 @@ make run
 - [ ] UI panels draggable
 - [ ] toggle grid on/off
 - [ ] debug UI on right
+- [x] paint tool
+- [x] remove placed tiles
+- [x] drag and pan with mouse
