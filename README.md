@@ -18,6 +18,9 @@ make run
 ## Todo
 
 - multi tile selection
+- reselectable/editable tiles
+- layers of tiles
+- adding colliders
 - randomly place tiles from multi selection
 - scroll tile UI
 - bucket tool
