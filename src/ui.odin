@@ -58,6 +58,7 @@ Selection :: struct {
 
 main_panel: Panel
 texture: rl.Texture2D
+tilemap_tex: rl.RenderTexture2D
 tiles: [dynamic]Tile
 scale: f32 = 1.0
 panel_tiles_in_row: i32 = 10
@@ -203,6 +204,25 @@ load_tiles :: proc(fname: cstring, tile_width, tile_height: f32, tex: ^rl.Textur
 			i += 1
 		}
 	}
+
+	// Reshape spritesheet to something that will fit in the UI
+	width := f32(panel_tiles_in_row) * tile_width * scale
+	height := f32(num_tiles_in_row * num_tiles_in_col) / tile_width * tile_width * scale
+	tilemap_tex = rl.LoadRenderTexture(i32(width), i32(height))
+
+	rl.BeginTextureMode(tilemap_tex)
+	rl.ClearBackground(rl.BLANK)
+
+	// TODO:(lukefilewalker) do I want to do/can this in the same loop as above?
+	for t, i in tiles {
+		x := f32(i32(i) % panel_tiles_in_row) * t.size.width * scale
+		y := f32(i32(i) / panel_tiles_in_row) * t.size.height * scale
+		dst := rl.Rectangle{x, f32(y), t.size.width * scale, t.size.height * scale}
+		rl.DrawTexturePro(texture, t.src_rec, dst, {0, 0}, 0, rl.WHITE)
+		fmt.printfln("%v %v", x, y)
+	}
+
+	rl.EndTextureMode()
 }
 
 // TODO:(lukefilewalker) debug
@@ -308,20 +328,30 @@ ui_draw :: proc() {
 		}
 	}
 
+	if tilemap_tex.texture.id != 0 {
+		src := rl.Rectangle{0, 0, f32(tilemap_tex.texture.width), f32(tilemap_tex.texture.height)}
+		xstart := main_panel.content_start_left
+		// TODO:(lukefilewalker) magic number
+		ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
+		dst := rl.Rectangle {
+			xstart,
+			ystart,
+			f32(tilemap_tex.texture.width),
+			f32(tilemap_tex.texture.height),
+		}
+		fmt.printfln("%v %v", src, dst)
+		rl.DrawTexturePro(tilemap_tex.texture, src, dst, {0, 0}, 0, rl.WHITE)
+		rl.DrawRectangleLinesEx(dst, 1, rl.GREEN)
+	}
+
 	if texture.id != 0 {
 		// Draw tiles
 		for t, i in tiles {
 			dst := t.dst_rec
 			dst.y += scroll_offset * 10
-			rl.DrawTexturePro(texture, t.src_rec, dst, {0, 0}, 0, rl.WHITE)
+			// rl.DrawTexturePro(texture, t.src_rec, dst, {0, 0}, 0, rl.WHITE)
 
-			rl.DrawRectangleLines(
-				i32(t.dst_rec.x),
-				i32(t.dst_rec.y),
-				i32(t.dst_rec.width),
-				i32(t.dst_rec.height),
-				rl.LIGHTGRAY,
-			)
+			rl.DrawRectangleLinesEx(t.dst_rec, 1, rl.LIGHTGRAY)
 		}
 
 		// Draw selected tile
