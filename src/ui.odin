@@ -39,10 +39,6 @@ Tile :: struct {
 	src_pos: rl.Vector2,
 	src_rec: rl.Rectangle,
 	dst_rec: rl.Rectangle,
-	size:    struct {
-		width:  f32,
-		height: f32,
-	},
 }
 
 Map :: struct {
@@ -51,17 +47,29 @@ Map :: struct {
 	tiles:     map[u16]Tile,
 }
 
+Tileset :: struct {
+	texture:         ^rl.Texture2D,
+	render_texture:  rl.RenderTexture2D,
+	// TODO:(lukefilewalker) or something?
+	backing_texture: rl.Texture2D,
+}
+
 Selection :: struct {
 	selected: bool,
 	tile:     Tile,
 }
 
-main_panel: Panel
-texture: rl.Texture2D
-tilemap_tex: rl.RenderTexture2D
-tiles: [dynamic]Tile
 scale: f32 = 1.0
-panel_tiles_in_row: i32 = 10
+main_panel: Panel
+
+imported_tileset: Tileset
+tileset: Tileset
+
+// original_tileset_ss: rl.Texture2D
+// tileset_ss: rl.RenderTexture2D
+
+tiles_data: [dynamic]Tile
+panel_num_tiles_in_row: i32 = 10
 selection: Selection
 hovering_tile: rl.Rectangle
 scroll_offset: f32
@@ -114,7 +122,7 @@ ui_setup :: proc() {
 					0,
 				)
 				if tilesheet != "" {
-					load_tiles(tilesheet, tile_width, tile_height, &texture)
+					load_tiles(tilesheet, tile_width, tile_height, &imported_tileset)
 				}
 			},
 		},
@@ -157,69 +165,89 @@ save_tilemap :: proc(fname: cstring) -> bool {
 	return os.write_entire_file(string(fname), data)
 }
 
-load_tiles :: proc(fname: cstring, tile_width, tile_height: f32, tex: ^rl.Texture2D) {
-	texture = rl.LoadTexture(fname)
+// TODO:(lukefilewalker) shadowing imported_tileset :(
+load_tiles :: proc(
+	fname: cstring,
+	src_tile_width, src_tile_height: f32,
+	imported_tileset: ^Tileset,
+) {
+	imported_tileset.texture = rl.LoadTexture(fname)
+	// TODO:(lukefilewalker) set texture to &backing_texture.texture
+	tex_num_tiles_in_row := imported_tileset.texture.width / i32(src_tile_width)
+	tex_num_tiles_in_col := imported_tileset.texture.height / i32(src_tile_height)
 
-	num_tiles_in_row := texture.width / i32(tile_width)
-	num_tiles_in_col := texture.height / i32(tile_height)
-	num_tile_cols := num_tiles_in_row * num_tiles_in_col / panel_tiles_in_row + 1
+	total_num_tiles := tex_num_tiles_in_row * tex_num_tiles_in_col
 
-	main_panel.internal_width = tile_width * scale * f32(panel_tiles_in_row)
-	main_panel.rect.width = main_panel.internal_width + main_panel.padding * 2
+	dst_tile_width := src_tile_width * scale
+	dst_tile_height := src_tile_height * scale
+
+	panel_num_tiles_in_col := total_num_tiles / panel_num_tiles_in_row + 1
+
 	// TODO:(lukefilewalker) dynamically add height of items already in panel
 	// TODO:(lukefilewalker) magic number
 	main_panel.rect.height =
-		f32(num_tile_cols) * tile_height * scale + f32(len(main_panel.items)) + 140
+		f32(panel_num_tiles_in_col) * dst_tile_height + f32(len(main_panel.items)) + 140
+	main_panel.internal_width = dst_tile_width * f32(panel_num_tiles_in_row)
+	main_panel.rect.width = main_panel.internal_width + main_panel.padding * 2
 
-	tiles = make([dynamic]Tile, num_tiles_in_row * num_tiles_in_col)
+	tiles_data = make([dynamic]Tile, total_num_tiles)
 
-	xstart := main_panel.content_start_left
+	panel_xstart := main_panel.content_start_left
 	// TODO:(lukefilewalker) magic number
-	ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
+	panel_ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
 
+	// Reshape tile array into something that will fit in the UI
 	i: i32
-	for y in 0 ..< num_tiles_in_col {
-		for x in 0 ..< num_tiles_in_row {
-			// TODO:(lukefilewalker)  huh?
-			// i := x * num_tiles_in_row + y
-			dst_x := i32(i) % panel_tiles_in_row
-			dst_y := i32(i) / panel_tiles_in_row
+	for y in 0 ..< tex_num_tiles_in_col {
+		for x in 0 ..< tex_num_tiles_in_row {
+			// TODO:(lukefilewalker) huh? Using i when I have x,y - but these x and y are for the original
+			// texture's coords?
+			src_x := i32(i) % tex_num_tiles_in_row
+			src_y := i32(i) / tex_num_tiles_in_row
+			dst_x := i32(i) % panel_num_tiles_in_row
+			dst_y := i32(i) / panel_num_tiles_in_row
 
-			tiles[y * num_tiles_in_row + x] = Tile {
+			tiles_data[y * tex_num_tiles_in_row + x] = Tile {
 				src_pos = {f32(x), f32(y)},
 				src_rec = {
-					x = f32(x) * tile_width,
-					y = f32(y) * tile_height,
-					width = tile_width,
-					height = tile_height,
+					x = f32(x) * src_tile_width,
+					y = f32(y) * src_tile_height,
+					width = src_tile_width,
+					height = src_tile_height,
 				},
 				dst_rec = {
-					x = f32(dst_x) * tile_width * scale + xstart,
-					y = f32(dst_y) * tile_height * scale + ystart,
-					width = tile_width * scale,
-					height = tile_height * scale,
+					x = f32(dst_x) * dst_tile_width + panel_xstart,
+					y = f32(dst_y) * dst_tile_height + panel_ystart,
+					width = dst_tile_width,
+					height = dst_tile_height,
 				},
-				size = {tile_width, tile_height},
 			}
+			fmt.printfln("%v", tiles_data[i])
 			i += 1
 		}
 	}
 
-	// Reshape spritesheet to something that will fit in the UI
-	width := f32(panel_tiles_in_row) * tile_width * scale
-	height := f32(num_tiles_in_row * num_tiles_in_col) / tile_width * tile_width * scale
-	tilemap_tex = rl.LoadRenderTexture(i32(width), i32(height))
+	// Redraw the new tile layout onto target texture
+	tilemap_width := f32(panel_num_tiles_in_row) * src_tile_width * scale
+	// TODO:(lukefilewalker) don't these cancel? the * and /
+	tilemap_height := f32(total_num_tiles) / src_tile_width * src_tile_width * scale
+	tileset.ren_texture = rl.LoadRenderTexture(i32(tilemap_width), i32(tilemap_height))
+	// TODO:(lukefilewalker) free the free the original tilemap tex?
+	// TODO:(lukefilewalker) set texture to &ren_texture.texture
 
-	rl.BeginTextureMode(tilemap_tex)
+	rl.BeginTextureMode(tileset.ren_texture)
 	rl.ClearBackground(rl.BLANK)
 
 	// TODO:(lukefilewalker) do I want to do/can this in the same loop as above?
-	for t, i in tiles {
-		x := f32(i32(i) % panel_tiles_in_row) * t.size.width * scale
-		y := f32(i32(i) / panel_tiles_in_row) * t.size.height * scale
-		dst := rl.Rectangle{x, f32(y), t.size.width * scale, t.size.height * scale}
-		rl.DrawTexturePro(texture, t.src_rec, dst, {0, 0}, 0, rl.WHITE)
-		fmt.printfln("%v %v", x, y)
+	for t, i in tiles_data {
+		t_height := t.dst_rec.height * scale
+		t_width := t.dst_rec.width * scale
+		x := f32(i32(i) % panel_num_tiles_in_row) * t_width
+		y := f32(i32(i) / panel_num_tiles_in_row) * t_height
+		dst := rl.Rectangle{x, y, t_width, src_tile_height}
+
+		rl.DrawTexturePro(imported_tileset.texture, t.src_rec, dst, {0, 0}, 0, rl.WHITE)
+		// fmt.printfln("%v %v", x, y)
 	}
 
 	rl.EndTextureMode()
@@ -236,16 +264,16 @@ ui_update :: proc() -> bool {
 
 	// Scroll tiles
 	if input.mouse.wheel_delta != 0 {
-		tile_width := tiles[0].dst_rec.width
-		tile_height := tiles[0].dst_rec.height
-		num_tiles_in_row := texture.width / i32(tile_width)
-		num_tiles_in_col := texture.height / i32(tile_height)
-		num_tile_cols := num_tiles_in_row * num_tiles_in_col / panel_tiles_in_row
+		tile_width := tiles_data[0].dst_rec.width
+		tile_height := tiles_data[0].dst_rec.height
+		num_tiles_in_row := imported_tileset.texture.width / i32(tile_width)
+		num_tiles_in_col := imported_tileset.texture.height / i32(tile_height)
+		num_tile_cols := num_tiles_in_row * num_tiles_in_col / panel_num_tiles_in_row
 
 		tiles_panel = rl.Rectangle {
-			x      = tiles[0].dst_rec.x,
-			y      = tiles[0].dst_rec.y,
-			width  = tiles[0].dst_rec.width * f32(panel_tiles_in_row),
+			x      = tiles_data[0].dst_rec.x,
+			y      = tiles_data[0].dst_rec.y,
+			width  = tiles_data[0].dst_rec.width * f32(panel_num_tiles_in_row),
 			height = f32(num_tile_cols) * tile_height * scale + 100,
 		}
 
@@ -255,7 +283,7 @@ ui_update :: proc() -> bool {
 	}
 
 	// TODO:(lukefilewalker) don't have to loop each tile - convert MouseButton-pos to grid and check tile there
-	for t, i in tiles {
+	for t, i in tiles_data {
 		if rl.CheckCollisionPointRec(input.mouse.px_pos, t.dst_rec) {
 			hovering_tile = t.dst_rec
 
@@ -330,7 +358,7 @@ ui_draw :: proc() {
 
 	if tilemap_tex.texture.id != 0 {
 		src := rl.Rectangle{0, 0, f32(tilemap_tex.texture.width), f32(tilemap_tex.texture.height)}
-		xstart := main_panel.content_start_left
+		xstart := main_panel.content_start_left + 700
 		// TODO:(lukefilewalker) magic number
 		ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
 		dst := rl.Rectangle {
@@ -344,9 +372,10 @@ ui_draw :: proc() {
 		rl.DrawRectangleLinesEx(dst, 1, rl.GREEN)
 	}
 
-	if texture.id != 0 {
+	// TODO:(lukefilewalker) add a "loaded" or something or nil check on Tileset struct/pointer
+	if imported_tileset.texture.id != 0 {
 		// Draw tiles
-		for t, i in tiles {
+		for t, i in tiles_data {
 			dst := t.dst_rec
 			dst.y += scroll_offset * 10
 			// rl.DrawTexturePro(texture, t.src_rec, dst, {0, 0}, 0, rl.WHITE)
@@ -361,7 +390,14 @@ ui_draw :: proc() {
 			selection.tile.dst_rec.width,
 			selection.tile.dst_rec.height,
 		}
-		rl.DrawTexturePro(texture, selection.tile.src_rec, dst, {0, 0}, 0, rl.WHITE)
+		rl.DrawTexturePro(
+			imported_tileset.texture,
+			selection.tile.src_rec,
+			dst,
+			{0, 0},
+			0,
+			rl.WHITE,
+		)
 
 		// Draw hovering tile
 		rl.DrawRectangleLinesEx(hovering_tile, 3, rl.RED)
