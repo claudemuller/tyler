@@ -1,4 +1,4 @@
-package adventure
+package tyler
 
 import "core:fmt"
 import "core:mem"
@@ -115,8 +115,10 @@ render :: proc() {
 	rl.BeginMode2D(camera)
 
 	// Draw tiles
-	for _, tile in blocks {
-		rl.DrawTexturePro(texture, tile.src_rec, tile.dst_rec, {0, 0}, 0, rl.WHITE)
+	if tileset.texture != nil {
+		for _, tile in blocks {
+			rl.DrawTexturePro(tileset.texture^, tile.src_rec, tile.dst_rec, {0, 0}, 0, rl.WHITE)
+		}
 	}
 
 	// Draw grid

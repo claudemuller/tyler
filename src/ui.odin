@@ -1,4 +1,4 @@
-package adventure
+package tyler
 
 import tfd "../vendor/tinyfiledialogs"
 import "core:encoding/json"
@@ -61,6 +61,7 @@ Selection :: struct {
 
 scale: f32 = 1.0
 main_panel: Panel
+ui_font: rl.Font
 
 imported_tileset: Tileset
 tileset: Tileset
@@ -77,6 +78,8 @@ tilesheet: cstring
 
 ui_setup :: proc() {
 	rl.GuiLoadStyle("res/style_dark.rgs")
+
+	ui_font = rl.LoadFont("res/HackNerdFont-Regular.ttf")
 
 	x: f32 = 20.0
 	y: f32 = 20.0
@@ -171,7 +174,9 @@ load_tiles :: proc(
 	src_tile_width, src_tile_height: f32,
 	imported_tileset: ^Tileset,
 ) {
-	imported_tileset.texture = rl.LoadTexture(fname)
+	imported_tileset.backing_texture = rl.LoadTexture(fname)
+	imported_tileset.texture = &imported_tileset.backing_texture
+
 	// TODO:(lukefilewalker) set texture to &backing_texture.texture
 	tex_num_tiles_in_row := imported_tileset.texture.width / i32(src_tile_width)
 	tex_num_tiles_in_col := imported_tileset.texture.height / i32(src_tile_height)
@@ -228,29 +233,42 @@ load_tiles :: proc(
 	}
 
 	// Redraw the new tile layout onto target texture
-	tilemap_width := f32(panel_num_tiles_in_row) * src_tile_width * scale
-	// TODO:(lukefilewalker) don't these cancel? the * and /
-	tilemap_height := f32(total_num_tiles) / src_tile_width * src_tile_width * scale
-	tileset.ren_texture = rl.LoadRenderTexture(i32(tilemap_width), i32(tilemap_height))
-	// TODO:(lukefilewalker) free the free the original tilemap tex?
-	// TODO:(lukefilewalker) set texture to &ren_texture.texture
+	tilemap_width := f32(panel_num_tiles_in_row) * dst_tile_width
+	tilemap_height := f32(panel_num_tiles_in_col) * dst_tile_height
 
-	rl.BeginTextureMode(tileset.ren_texture)
+	tileset.render_texture = rl.LoadRenderTexture(i32(tilemap_width), i32(tilemap_height))
+	tileset.texture = &tileset.render_texture.texture
+	// TODO:(lukefilewalker) free the free the original tilemap tex?
+
+	rl.BeginTextureMode(tileset.render_texture)
 	rl.ClearBackground(rl.BLANK)
 
 	// TODO:(lukefilewalker) do I want to do/can this in the same loop as above?
-	for t, i in tiles_data {
-		t_height := t.dst_rec.height * scale
-		t_width := t.dst_rec.width * scale
-		x := f32(i32(i) % panel_num_tiles_in_row) * t_width
-		y := f32(i32(i) / panel_num_tiles_in_row) * t_height
-		dst := rl.Rectangle{x, y, t_width, src_tile_height}
+	for y in 0 ..< tex_num_tiles_in_col {
+		for x in 0 ..< tex_num_tiles_in_row {
+			// for t, i in tiles_data {
+			i := y * panel_num_tiles_in_row + x
+			t_height := tiles_data[i].dst_rec.height
+			t_width := tiles_data[i].dst_rec.width
+			// x := f32(i32(i) % panel_num_tiles_in_row) * t_width
+			// y := f32(i32(i) / panel_num_tiles_in_row) * t_height
+			dst := rl.Rectangle{f32(x), f32(y), t_width, t_height}
 
-		rl.DrawTexturePro(imported_tileset.texture, t.src_rec, dst, {0, 0}, 0, rl.WHITE)
-		// fmt.printfln("%v %v", x, y)
+			rl.DrawTexturePro(
+				imported_tileset.texture^,
+				tiles_data[i].src_rec,
+				dst,
+				{0, 0},
+				0,
+				rl.WHITE,
+			)
+			// fmt.printfln("%v %v", x, y)
+		}
 	}
 
 	rl.EndTextureMode()
+
+	rl.ExportImage(rl.LoadImageFromTexture(tileset.texture^), "tileset.png")
 }
 
 // TODO:(lukefilewalker) debug
@@ -356,54 +374,73 @@ ui_draw :: proc() {
 		}
 	}
 
-	if tilemap_tex.texture.id != 0 {
-		src := rl.Rectangle{0, 0, f32(tilemap_tex.texture.width), f32(tilemap_tex.texture.height)}
-		xstart := main_panel.content_start_left + 700
-		// TODO:(lukefilewalker) magic number
-		ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
-		dst := rl.Rectangle {
-			xstart,
-			ystart,
-			f32(tilemap_tex.texture.width),
-			f32(tilemap_tex.texture.height),
-		}
-		fmt.printfln("%v %v", src, dst)
-		rl.DrawTexturePro(tilemap_tex.texture, src, dst, {0, 0}, 0, rl.WHITE)
-		rl.DrawRectangleLinesEx(dst, 1, rl.GREEN)
-	}
-
-	// TODO:(lukefilewalker) add a "loaded" or something or nil check on Tileset struct/pointer
-	if imported_tileset.texture.id != 0 {
-		// Draw tiles
-		for t, i in tiles_data {
-			dst := t.dst_rec
-			dst.y += scroll_offset * 10
-			// rl.DrawTexturePro(texture, t.src_rec, dst, {0, 0}, 0, rl.WHITE)
-
-			rl.DrawRectangleLinesEx(t.dst_rec, 1, rl.LIGHTGRAY)
-		}
-
-		// Draw selected tile
-		dst := rl.Rectangle {
-			input.mouse.px_pos.x,
-			input.mouse.px_pos.y,
-			selection.tile.dst_rec.width,
-			selection.tile.dst_rec.height,
-		}
-		rl.DrawTexturePro(
-			imported_tileset.texture,
-			selection.tile.src_rec,
-			dst,
-			{0, 0},
-			0,
-			rl.WHITE,
-		)
-
-		// Draw hovering tile
-		rl.DrawRectangleLinesEx(hovering_tile, 3, rl.RED)
-	}
+	draw_tileset()
 
 	ui_draw_debug()
+}
+
+draw_tileset :: proc() {
+	if tileset.texture == nil {
+		return
+	}
+
+	src := rl.Rectangle {
+		0,
+		0,
+		f32(imported_tileset.texture.width),
+		f32(imported_tileset.texture.height),
+	}
+	xstart := main_panel.content_start_left
+	// TODO:(lukefilewalker) magic number
+	ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
+	dst := rl.Rectangle{xstart, ystart, f32(tileset.texture.width), f32(tileset.texture.height)}
+
+	fmt.printfln("%v %v", src, dst)
+
+	rl.DrawTexturePro(imported_tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
+	rl.DrawRectangleLinesEx(dst, 1, rl.GREEN)
+
+	// Draw tile outlines
+	for t, i in tiles_data {
+		dst := t.dst_rec
+		dst.y += scroll_offset * 10
+		// rl.DrawTexturePro(texture, t.src_rec, dst, {0, 0}, 0, rl.WHITE)
+
+		rl.DrawRectangleLinesEx(t.dst_rec, 1, rl.LIGHTGRAY)
+	}
+
+	// Draw selected tile
+	dst = rl.Rectangle {
+		input.mouse.px_pos.x,
+		input.mouse.px_pos.y,
+		selection.tile.dst_rec.width,
+		selection.tile.dst_rec.height,
+	}
+	rl.DrawTexturePro(imported_tileset.texture^, selection.tile.src_rec, dst, {0, 0}, 0, rl.WHITE)
+
+	// Draw hovering tile
+	rl.DrawRectangleLinesEx(hovering_tile, 3, rl.RED)
+
+	// Debug text
+	for t, i in tiles_data {
+		font_size: i32 = 15
+		dst_txt := fmt.ctprintf("%v\n%v", t.dst_rec, t.src_rec)
+		dst_txt_w := rl.MeasureText(dst_txt, font_size)
+
+		if rl.CheckCollisionPointRec(input.mouse.px_pos, t.dst_rec) {
+			x := input.mouse.px_pos.x
+			y := input.mouse.px_pos.y
+			rl.DrawRectangle(i32(x + 10), i32(y), dst_txt_w + 50, 100, rl.GRAY)
+			rl.DrawTextEx(
+				ui_font,
+				dst_txt,
+				rl.Vector2{x + 5, y + 5},
+				f32(font_size),
+				0,
+				rl.DARKGRAY,
+			)
+		}
+	}
 }
 
 ui_draw_debug :: proc() {
