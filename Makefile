@@ -6,3 +6,6 @@ build:
 
 build-debug:
 	odin build ./src -out=bin/tyler-debug -debug
+
+clean:
+	rm -rf ./bin/*

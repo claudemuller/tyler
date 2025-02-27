@@ -186,7 +186,7 @@ load_tiles :: proc(
 	dst_tile_width := src_tile_width * scale
 	dst_tile_height := src_tile_height * scale
 
-	panel_num_tiles_in_col := total_num_tiles / panel_num_tiles_in_row + 1
+	panel_num_tiles_in_col := total_num_tiles / panel_num_tiles_in_row
 
 	// TODO:(lukefilewalker) dynamically add height of items already in panel
 	// TODO:(lukefilewalker) magic number
@@ -227,7 +227,6 @@ load_tiles :: proc(
 					height = dst_tile_height,
 				},
 			}
-			fmt.printfln("%v", tiles_data[i])
 			i += 1
 		}
 	}
@@ -244,29 +243,32 @@ load_tiles :: proc(
 	rl.ClearBackground(rl.BLANK)
 
 	// TODO:(lukefilewalker) do I want to do/can this in the same loop as above?
-	for y in 0 ..< tex_num_tiles_in_col {
-		for x in 0 ..< tex_num_tiles_in_row {
+	 for y in 0 ..< panel_num_tiles_in_col {
+		for x in 0 ..< panel_num_tiles_in_row {
 			// for t, i in tiles_data {
 			i := y * panel_num_tiles_in_row + x
-			t_height := tiles_data[i].dst_rec.height
+//			srcx := dsti % tex_num_tiles_in_row
+//			srcy := dsti / tex_num_tiles_in_row
 			t_width := tiles_data[i].dst_rec.width
+			t_height := tiles_data[i].dst_rec.height
 			// x := f32(i32(i) % panel_num_tiles_in_row) * t_width
 			// y := f32(i32(i) / panel_num_tiles_in_row) * t_height
-			dst := rl.Rectangle{f32(x), f32(y), t_width, t_height}
+			dst := rl.Rectangle{f32(x) * t_width, f32(y) * t_height, t_width, t_height}
+			src := rl.Rectangle {
+				f32(tex_num_tiles_in_col * 32) - 32 - tiles_data[i].src_rec.x,
+				f32(tex_num_tiles_in_row * 32) - 32 - tiles_data[i].src_rec.y,
+				tiles_data[i].src_rec.width,
+				-tiles_data[i].src_rec.height,
+			}
 
-			rl.DrawTexturePro(
-				imported_tileset.texture^,
-				tiles_data[i].src_rec,
-				dst,
-				{0, 0},
-				0,
-				rl.WHITE,
-			)
+			rl.DrawTexturePro(imported_tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
 			// fmt.printfln("%v %v", x, y)
 		}
+//		y += 1
 	}
 
 	rl.EndTextureMode()
+	tileset.texture = &tileset.render_texture.texture
 
 	rl.ExportImage(rl.LoadImageFromTexture(tileset.texture^), "tileset.png")
 }
@@ -384,12 +386,7 @@ draw_tileset :: proc() {
 		return
 	}
 
-	src := rl.Rectangle {
-		0,
-		0,
-		f32(imported_tileset.texture.width),
-		f32(imported_tileset.texture.height),
-	}
+	src := rl.Rectangle{0, 0, f32(tileset.texture.width), f32(tileset.texture.height)}
 	xstart := main_panel.content_start_left
 	// TODO:(lukefilewalker) magic number
 	ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
@@ -397,7 +394,7 @@ draw_tileset :: proc() {
 
 	fmt.printfln("%v %v", src, dst)
 
-	rl.DrawTexturePro(imported_tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
+	rl.DrawTexturePro(tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
 	rl.DrawRectangleLinesEx(dst, 1, rl.GREEN)
 
 	// Draw tile outlines
