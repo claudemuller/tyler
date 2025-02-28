@@ -244,7 +244,6 @@ load_tiles :: proc(
 
 	tileset.render_texture = rl.LoadRenderTexture(i32(tilemap_width), i32(tilemap_height))
 	tileset.texture = &tileset.render_texture.texture
-	// TODO:(lukefilewalker) free the free the original tilemap tex?
 
 	rl.BeginTextureMode(tileset.render_texture)
 	rl.ClearBackground(rl.BLANK)
@@ -274,10 +273,7 @@ load_tiles :: proc(
 	// //		y += 1
 	// 	}
 
-	// for i := total_num_tiles - 1; i >= 0; i -= 1 {
 	for tile in tiles_data {
-		// tile := tiles_data[i]
-
 		src := tile.src_rec
 		src.height *= -1
 		src.x = f32(tex_num_tiles_in_row * 32) - 32 - tile.src_rec.x
@@ -290,7 +286,8 @@ load_tiles :: proc(
 	}
 
 	rl.EndTextureMode()
-	tileset.texture = &tileset.render_texture.texture
+
+	// TODO:(lukefilewalker) free the free the original tilemap tex?
 
 	rl.ExportImage(rl.LoadImageFromTexture(tileset.texture^), "tileset.png")
 }
@@ -409,9 +406,8 @@ draw_tileset :: proc() {
 	}
 
 	src := rl.Rectangle{0, 0, f32(tileset.texture.width), f32(tileset.texture.height)}
-	xstart: f32 = 0 //main_panel.content_start_left
-	// TODO:(lukefilewalker) magic number
-	ystart: f32 = 0 // y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
+	xstart := main_panel.content_start_left
+	ystart := y_pos(main_panel.content_start_top, len(main_panel.items))
 	dst := rl.Rectangle{xstart, ystart, f32(tileset.texture.width), f32(tileset.texture.height)}
 
 	rl.DrawTexturePro(tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
@@ -420,10 +416,10 @@ draw_tileset :: proc() {
 	// Draw tile outlines
 	for t, i in tiles_data {
 		dst := t.dst_rec
-		dst.y += scroll_offset * 10
-		// rl.DrawTexturePro(texture, t.src_rec, dst, {0, 0}, 0, rl.WHITE)
+		dst.x += xstart
+		dst.y += ystart + scroll_offset * 10
 
-		rl.DrawRectangleLinesEx(t.dst_rec, 1, rl.LIGHTGRAY)
+		rl.DrawRectangleLinesEx(dst, 1, rl.LIGHTGRAY)
 	}
 
 	// Draw selected tile
