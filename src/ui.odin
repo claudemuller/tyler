@@ -8,6 +8,7 @@ import "core:strconv"
 import rl "vendor:raylib"
 
 PANEL_PADDING :: 8.0
+PANEL_HEADER :: 25
 BTN_HEIGHT :: 30.0
 
 Panel :: struct {
@@ -89,7 +90,7 @@ ui_setup :: proc() {
 		rect               = {x, y, w, 100},
 		padding            = PANEL_PADDING,
 		content_start_left = x + PANEL_PADDING,
-		content_start_top  = y + PANEL_PADDING + 10,
+		content_start_top  = y + PANEL_PADDING + PANEL_HEADER,
 		internal_width     = w - PANEL_PADDING * 2,
 	}
 
@@ -99,7 +100,11 @@ ui_setup :: proc() {
 	// load_tiles("../that-guy/res/assets/tilemap.png", 16, 16, &texture)
 	// _Debug
 
-	append(&main_panel.items, Item{label = "Scale", type = .Slider, value = &scale})
+	append(
+		&main_panel.items,
+		Item{label = "Scale", type = .Slider, value = &scale, height = BTN_HEIGHT / 2},
+	)
+
 	append(
 		&main_panel.items,
 		Item {
@@ -150,6 +155,11 @@ ui_setup :: proc() {
 			}
 		},
 	})
+
+	recalculate_panel_dims(
+		main_panel.internal_width,
+		f32(len(main_panel.items)) * (BTN_HEIGHT + PANEL_PADDING),
+	)
 }
 
 save_tilemap :: proc(fname: cstring) -> bool {
@@ -188,12 +198,10 @@ load_tiles :: proc(
 
 	panel_num_tiles_in_col := total_num_tiles / panel_num_tiles_in_row
 
-	// TODO:(lukefilewalker) dynamically add height of items already in panel
-	// TODO:(lukefilewalker) magic number
-	main_panel.rect.height =
+	panel_int_height :=
 		f32(panel_num_tiles_in_col) * dst_tile_height + f32(len(main_panel.items)) + 140
-	main_panel.internal_width = dst_tile_width * f32(panel_num_tiles_in_row)
-	main_panel.rect.width = main_panel.internal_width + main_panel.padding * 2
+	panel_int_width := dst_tile_width * f32(panel_num_tiles_in_row)
+	recalculate_panel_dims(panel_int_width, panel_int_height)
 
 	tiles_data = make([dynamic]Tile, total_num_tiles)
 
@@ -202,32 +210,31 @@ load_tiles :: proc(
 	panel_ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
 
 	// Reshape tile array into something that will fit in the UI
-	i: i32
-	for y in 0 ..< tex_num_tiles_in_col {
-		for x in 0 ..< tex_num_tiles_in_row {
-			// TODO:(lukefilewalker) huh? Using i when I have x,y - but these x and y are for the original
-			// texture's coords?
-			src_x := i32(i) % tex_num_tiles_in_row
-			src_y := i32(i) / tex_num_tiles_in_row
-			dst_x := i32(i) % panel_num_tiles_in_row
-			dst_y := i32(i) / panel_num_tiles_in_row
+	// i: i32
+	// for y in 0 ..< tex_num_tiles_in_col {
+	// 	for x in 0 ..< tex_num_tiles_in_row {
+	for i in 0 ..< total_num_tiles {
+		// TODO:(lukefilewalker) huh? Using i when I have x,y - but these x and y are for the original
+		// texture's coords?
+		src_x := i32(i) % tex_num_tiles_in_row
+		src_y := i32(i) / tex_num_tiles_in_row
+		dst_x := i32(i) % panel_num_tiles_in_row
+		dst_y := i32(i) / panel_num_tiles_in_row
 
-			tiles_data[y * tex_num_tiles_in_row + x] = Tile {
-				src_pos = {f32(x), f32(y)},
-				src_rec = {
-					x = f32(x) * src_tile_width,
-					y = f32(y) * src_tile_height,
-					width = src_tile_width,
-					height = src_tile_height,
-				},
-				dst_rec = {
-					x = f32(dst_x) * dst_tile_width + panel_xstart,
-					y = f32(dst_y) * dst_tile_height + panel_ystart,
-					width = dst_tile_width,
-					height = dst_tile_height,
-				},
-			}
-			i += 1
+		tiles_data[i] = Tile {
+			src_pos = {f32(src_x), f32(src_y)},
+			src_rec = {
+				x = f32(src_x) * src_tile_width,
+				y = f32(src_y) * src_tile_height,
+				width = src_tile_width,
+				height = src_tile_height,
+			},
+			dst_rec = {
+				x      = f32(dst_x) * dst_tile_width, // + panel_xstart,
+				y      = f32(dst_y) * dst_tile_height, // + panel_ystart,
+				width  = dst_tile_width,
+				height = dst_tile_height,
+			},
 		}
 	}
 
@@ -243,28 +250,38 @@ load_tiles :: proc(
 	rl.ClearBackground(rl.BLANK)
 
 	// TODO:(lukefilewalker) do I want to do/can this in the same loop as above?
-	 for y in 0 ..< panel_num_tiles_in_col {
-		for x in 0 ..< panel_num_tiles_in_row {
-			// for t, i in tiles_data {
-			i := y * panel_num_tiles_in_row + x
-//			srcx := dsti % tex_num_tiles_in_row
-//			srcy := dsti / tex_num_tiles_in_row
-			t_width := tiles_data[i].dst_rec.width
-			t_height := tiles_data[i].dst_rec.height
-			// x := f32(i32(i) % panel_num_tiles_in_row) * t_width
-			// y := f32(i32(i) / panel_num_tiles_in_row) * t_height
-			dst := rl.Rectangle{f32(x) * t_width, f32(y) * t_height, t_width, t_height}
-			src := rl.Rectangle {
-				f32(tex_num_tiles_in_col * 32) - 32 - tiles_data[i].src_rec.x,
-				f32(tex_num_tiles_in_row * 32) - 32 - tiles_data[i].src_rec.y,
-				tiles_data[i].src_rec.width,
-				-tiles_data[i].src_rec.height,
-			}
+	// 	 for y in 0 ..< panel_num_tiles_in_col {
+	// 		for x in 0 ..< panel_num_tiles_in_row {
+	// 			// for t, i in tiles_data {
+	// 			i := y * panel_num_tiles_in_row + x
+	// //			srcx := dsti % tex_num_tiles_in_row
+	// //			srcy := dsti / tex_num_tiles_in_row
+	// 			t_width := tiles_data[i].dst_rec.width
+	// 			t_height := tiles_data[i].dst_rec.height
+	// 			// x := f32(i32(i) % panel_num_tiles_in_row) * t_width
+	// 			// y := f32(i32(i) / panel_num_tiles_in_row) * t_height
+	// 			dst := rl.Rectangle{f32(x) * t_width, f32(y) * t_height, t_width, t_height}
+	// 			src := rl.Rectangle {
+	// 				f32(tex_num_tiles_in_col * 32) - 32 - tiles_data[i].src_rec.x,
+	// 				f32(tex_num_tiles_in_row * 32) - 32 - tiles_data[i].src_rec.y,
+	// 				tiles_data[i].src_rec.width,
+	// 				-tiles_data[i].src_rec.height,
+	// 			}
+	//
+	// 			rl.DrawTexturePro(imported_tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
+	// 			// fmt.printfln("%v %v", x, y)
+	// 		}
+	// //		y += 1
+	// 	}
 
-			rl.DrawTexturePro(imported_tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
-			// fmt.printfln("%v %v", x, y)
-		}
-//		y += 1
+	for tile in tiles_data {
+
+		src := tile.src_rec
+		src.height *= -1
+
+		dst := tile.dst_rec
+
+		rl.DrawTexturePro(imported_tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
 	}
 
 	rl.EndTextureMode()
@@ -330,7 +347,7 @@ ui_draw :: proc() {
 					main_panel.content_start_left,
 					y_pos(main_panel.content_start_top, i),
 					main_panel.internal_width,
-					main_panel.content_start_top + main_panel.padding * 2.5,
+					item.height,
 				},
 				item.value == nil ? fmt.ctprint(item.label) : fmt.ctprintf("%s %f", item.label, item.value^),
 			)
@@ -340,7 +357,7 @@ ui_draw :: proc() {
 				{
 					main_panel.content_start_left,
 					// TODO:(lukefilewalker) magic num
-					y_pos(main_panel.content_start_top, i) + 20,
+					y_pos(main_panel.content_start_top, i),
 					main_panel.internal_width,
 					item.height,
 				},
@@ -355,7 +372,7 @@ ui_draw :: proc() {
 					main_panel.content_start_left,
 					y_pos(main_panel.content_start_top, i),
 					main_panel.internal_width,
-					main_panel.content_start_top + main_panel.padding * 2.5,
+					item.height,
 				},
 				item.value == nil ? fmt.ctprint(item.label) : fmt.ctprintf("%s %f", item.label, item.value^),
 			)
@@ -363,7 +380,7 @@ ui_draw :: proc() {
 				{
 					// TODO:(lukefilewalker) magic num
 					main_panel.content_start_left + 120,
-					y_pos(main_panel.content_start_top, i) + 29,
+					y_pos(main_panel.content_start_top, i),
 					main_panel.internal_width - 150,
 					item.height,
 				},
@@ -387,12 +404,10 @@ draw_tileset :: proc() {
 	}
 
 	src := rl.Rectangle{0, 0, f32(tileset.texture.width), f32(tileset.texture.height)}
-	xstart := main_panel.content_start_left
+	xstart: f32 = 0 //main_panel.content_start_left
 	// TODO:(lukefilewalker) magic number
-	ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
+	ystart: f32 = 0 // y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
 	dst := rl.Rectangle{xstart, ystart, f32(tileset.texture.width), f32(tileset.texture.height)}
-
-	fmt.printfln("%v %v", src, dst)
 
 	rl.DrawTexturePro(tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
 	rl.DrawRectangleLinesEx(dst, 1, rl.GREEN)
@@ -453,5 +468,11 @@ ui_draw_debug :: proc() {
 }
 
 y_pos :: proc(y_from_top: f32, n: int) -> f32 {
-	return y_from_top + (BTN_HEIGHT * f32(n))
+	return y_from_top + ((BTN_HEIGHT + PANEL_PADDING) * f32(n))
+}
+
+recalculate_panel_dims :: proc(internal_w, internal_h: f32) {
+	main_panel.rect.height = internal_h + PANEL_HEADER + main_panel.padding * 2
+	main_panel.internal_width = internal_w
+	main_panel.rect.width = main_panel.internal_width + main_panel.padding * 2
 }
