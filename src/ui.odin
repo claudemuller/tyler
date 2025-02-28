@@ -205,9 +205,9 @@ load_tiles :: proc(
 
 	tiles_data = make([dynamic]Tile, total_num_tiles)
 
-	panel_xstart := main_panel.content_start_left
+	// panel_xstart := main_panel.content_start_left
 	// TODO:(lukefilewalker) magic number
-	panel_ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
+	// panel_ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
 
 	// Reshape tile array into something that will fit in the UI
 	// i: i32
@@ -301,6 +301,9 @@ ui_update :: proc() -> bool {
 		return false
 	}
 
+	xstart := main_panel.content_start_left
+	ystart := y_pos(main_panel.content_start_top, len(main_panel.items))
+
 	// Scroll tiles
 	if input.mouse.wheel_delta != 0 {
 		tile_width := tiles_data[0].dst_rec.width
@@ -321,9 +324,21 @@ ui_update :: proc() -> bool {
 		}
 	}
 
-	// TODO:(lukefilewalker) don't have to loop each tile - convert MouseButton-pos to grid and check tile there
-	for t, i in tiles_data {
-		if rl.CheckCollisionPointRec(input.mouse.px_pos, t.dst_rec) {
+	if tileset.texture != nil {
+		panel_num_tiles_in_col := tileset.texture.height / 64
+
+		tileset_panel := rl.Rectangle {
+			xstart,
+			ystart,
+			f32(tileset.texture.width),
+			f32(tileset.texture.height),
+		}
+		if rl.CheckCollisionPointRec(input.mouse.px_pos, tileset_panel) {
+			// x := i32((input.mouse.px_pos.x - xstart / f32(panel_num_tiles_in_row)) / 64)
+			x := i32((input.mouse.px_pos.x - xstart) / 64)
+			y := i32((input.mouse.px_pos.y - ystart) / 64)
+
+			t := tiles_data[y * panel_num_tiles_in_row + x]
 			hovering_tile = t.dst_rec
 
 			if .LEFT in input.mouse.btns {
@@ -358,7 +373,6 @@ ui_draw :: proc() {
 			if rl.GuiButton(
 				{
 					main_panel.content_start_left,
-					// TODO:(lukefilewalker) magic num
 					y_pos(main_panel.content_start_top, i),
 					main_panel.internal_width,
 					item.height,
@@ -405,15 +419,17 @@ draw_tileset :: proc() {
 		return
 	}
 
-	src := rl.Rectangle{0, 0, f32(tileset.texture.width), f32(tileset.texture.height)}
 	xstart := main_panel.content_start_left
 	ystart := y_pos(main_panel.content_start_top, len(main_panel.items))
+
+	src := rl.Rectangle{0, 0, f32(tileset.texture.width), f32(tileset.texture.height)}
 	dst := rl.Rectangle{xstart, ystart, f32(tileset.texture.width), f32(tileset.texture.height)}
 
 	rl.DrawTexturePro(tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
 	rl.DrawRectangleLinesEx(dst, 1, rl.GREEN)
 
 	// Draw tile outlines
+	// dst : rl.Rectangle
 	for t, i in tiles_data {
 		dst := t.dst_rec
 		dst.x += xstart
@@ -432,6 +448,8 @@ draw_tileset :: proc() {
 	rl.DrawTexturePro(imported_tileset.texture^, selection.tile.src_rec, dst, {0, 0}, 0, rl.WHITE)
 
 	// Draw hovering tile
+	hovering_tile.x += xstart
+	hovering_tile.y += ystart
 	rl.DrawRectangleLinesEx(hovering_tile, 3, rl.RED)
 
 	// Debug text
