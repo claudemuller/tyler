@@ -274,12 +274,17 @@ load_tiles :: proc(
 	// //		y += 1
 	// 	}
 
+	// for i := total_num_tiles - 1; i >= 0; i -= 1 {
 	for tile in tiles_data {
+		// tile := tiles_data[i]
 
 		src := tile.src_rec
 		src.height *= -1
+		src.x = f32(tex_num_tiles_in_row * 32) - 32 - tile.src_rec.x
+		src.y = f32(tex_num_tiles_in_col * 32) - 32 - tile.src_rec.y
 
 		dst := tile.dst_rec
+		dst.x = f32(panel_num_tiles_in_row * 64) - 64 - tile.dst_rec.x
 
 		rl.DrawTexturePro(imported_tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
 	}
