@@ -34,13 +34,12 @@ main :: proc() {
 		mem.tracking_allocator_destroy(&track)
 	}
 
-	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Adventure")
+	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Tyler")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 	rl.SetExitKey(.ESCAPE)
 
 	setup()
-	ui_setup()
 
 	for !rl.WindowShouldClose() {
 		process_input()
@@ -55,6 +54,8 @@ setup :: proc() {
 		offset = {WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2},
 		zoom   = 1,
 	}
+
+	ui_setup()
 }
 
 update :: proc() {
@@ -116,8 +117,12 @@ render :: proc() {
 
 	// Draw tiles
 	if tileset.texture != nil {
+		src: rl.Rectangle
 		for _, tile in blocks {
-			rl.DrawTexturePro(tileset.texture^, tile.src_rec, tile.dst_rec, {0, 0}, 0, rl.WHITE)
+			src = tile.dst_rec
+			src.x = tile.pos.x * tile.dst_rec.width
+			src.y = tile.pos.y * tile.dst_rec.height
+			rl.DrawTexturePro(tileset.texture^, src, tile.dst_rec, {0, 0}, 0, rl.WHITE)
 		}
 	}
 

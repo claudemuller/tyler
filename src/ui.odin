@@ -37,7 +37,7 @@ Item :: struct {
 }
 
 Tile :: struct {
-	src_pos: rl.Vector2,
+	pos:     rl.Vector2,
 	src_rec: rl.Rectangle,
 	dst_rec: rl.Rectangle,
 }
@@ -66,9 +66,6 @@ ui_font: rl.Font
 
 imported_tileset: Tileset
 tileset: Tileset
-
-// original_tileset_ss: rl.Texture2D
-// tileset_ss: rl.RenderTexture2D
 
 tiles_data: [dynamic]Tile
 panel_num_tiles_in_row: i32 = 10
@@ -176,6 +173,8 @@ save_tilemap :: proc(fname: cstring) -> bool {
 	}
 	defer free_all(context.temp_allocator)
 
+	rl.ExportImage(rl.LoadImageFromTexture(tileset.texture^), fmt.ctprintf("%s.png", fname))
+
 	return os.write_entire_file(string(fname), data)
 }
 
@@ -213,13 +212,13 @@ load_tiles :: proc(
 		dst_y := i32(i) / panel_num_tiles_in_row
 
 		tiles_data[i] = Tile {
-			src_pos = {f32(src_x), f32(src_y)},
 			src_rec = {
 				x = f32(src_x) * src_tile_width,
 				y = f32(src_y) * src_tile_height,
 				width = src_tile_width,
 				height = src_tile_height,
 			},
+			pos = {f32(dst_x), f32(dst_y)},
 			dst_rec = {
 				x = f32(dst_x) * dst_tile_width,
 				y = f32(dst_y) * dst_tile_height,
@@ -279,10 +278,6 @@ load_tiles :: proc(
 	rl.EndTextureMode()
 
 	// TODO:(lukefilewalker) free the free the original tilemap tex?
-}
-
-save_tileset :: proc() {
-	rl.ExportImage(rl.LoadImageFromTexture(tileset.texture^), "tileset.png")
 }
 
 // TODO:(lukefilewalker) debug
@@ -408,26 +403,25 @@ ui_draw_tileset :: proc() {
 	dst := rl.Rectangle{xstart, ystart, f32(tileset.texture.width), f32(tileset.texture.height)}
 
 	rl.DrawTexturePro(tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
-	rl.DrawRectangleLinesEx(dst, 1, rl.GREEN)
 
 	// Draw tile outlines
-	// dst : rl.Rectangle
+	dst_tile: rl.Rectangle
 	for t, i in tiles_data {
-		dst := t.dst_rec
-		dst.x += xstart
-		dst.y += ystart + scroll_offset * 10
+		dst_tile = t.dst_rec
+		dst_tile.x += xstart
+		dst_tile.y += ystart //+ scroll_offset * 10
 
-		rl.DrawRectangleLinesEx(dst, 1, rl.LIGHTGRAY)
+		rl.DrawRectangleLinesEx(dst_tile, 1, rl.LIGHTGRAY)
 	}
 
-	// Draw selected tile
-	dst = rl.Rectangle {
+	// Draw selected tile next to mouse cursor
+	dst_selected := rl.Rectangle {
 		input.mouse.px_pos.x,
 		input.mouse.px_pos.y,
 		selection.tile.dst_rec.width,
 		selection.tile.dst_rec.height,
 	}
-	rl.DrawTexturePro(imported_tileset.texture^, selection.tile.src_rec, dst, {0, 0}, 0, rl.WHITE)
+	rl.DrawTexturePro(tileset.texture^, selection.tile.dst_rec, dst_selected, {0, 0}, 0, rl.WHITE)
 
 	// Draw hovering tile
 	hovering_tile.x += xstart
@@ -435,25 +429,25 @@ ui_draw_tileset :: proc() {
 	rl.DrawRectangleLinesEx(hovering_tile, 3, rl.RED)
 
 	// Debug text
-	for t, i in tiles_data {
-		font_size: i32 = 15
-		dst_txt := fmt.ctprintf("%v\n%v", t.dst_rec, t.src_rec)
-		dst_txt_w := rl.MeasureText(dst_txt, font_size)
-
-		if rl.CheckCollisionPointRec(input.mouse.px_pos, t.dst_rec) {
-			x := input.mouse.px_pos.x
-			y := input.mouse.px_pos.y
-			rl.DrawRectangle(i32(x + 10), i32(y), dst_txt_w + 50, 100, rl.GRAY)
-			rl.DrawTextEx(
-				ui_font,
-				dst_txt,
-				rl.Vector2{x + 5, y + 5},
-				f32(font_size),
-				0,
-				rl.DARKGRAY,
-			)
-		}
-	}
+	// for t, i in tiles_data {
+	// 	font_size: i32 = 15
+	// 	dst_txt := fmt.ctprintf("%v\n%v", t.dst_rec, t.src_rec)
+	// 	dst_txt_w := rl.MeasureText(dst_txt, font_size)
+	//
+	// 	if rl.CheckCollisionPointRec(input.mouse.px_pos, t.dst_rec) {
+	// 		x := input.mouse.px_pos.x
+	// 		y := input.mouse.px_pos.y
+	// 		rl.DrawRectangle(i32(x + 10), i32(y), dst_txt_w + 50, 100, rl.GRAY)
+	// 		rl.DrawTextEx(
+	// 			ui_font,
+	// 			dst_txt,
+	// 			rl.Vector2{x + 5, y + 5},
+	// 			f32(font_size),
+	// 			0,
+	// 			rl.DARKGRAY,
+	// 		)
+	// 	}
+	// }
 }
 
 ui_draw_debug :: proc() {
