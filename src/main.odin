@@ -10,10 +10,6 @@ WINDOW_HEIGHT :: 1080
 WORLD_WIDTH :: 1920 * 2
 WORLD_HEIGHT :: 1080 * 2
 
-// BLOCK_SIZE :: 32
-// BLOCKS_IN_ROW :: WORLD_WIDTH / BLOCK_SIZE
-// BLOCKS_IN_COL :: WORLD_HEIGHT / BLOCK_SIZE
-
 camera: rl.Camera2D
 input: Input
 blocks: map[u16]Tile
@@ -76,14 +72,14 @@ update :: proc() {
 	// Place a tile
 	if selection.selected && .LEFT in input.mouse.btns {
 		world_mouse_pos := rl.GetScreenToWorld2D(input.mouse.px_pos, camera)
-		x := i32(world_mouse_pos.x) / block_size
-		y := i32(world_mouse_pos.y) / block_size
-		hash := gen_hash(x, y)
-
 		tile := selection.tile
 
-		tile.dst_rec.x = f32(x * block_size)
-		tile.dst_rec.y = f32(y * block_size)
+		x := i32(world_mouse_pos.x / tile.dst_rec.width)
+		y := i32(world_mouse_pos.y / tile.dst_rec.height)
+		hash := gen_hash(x, y)
+
+		tile.dst_rec.x = f32(x) * tile.dst_rec.width
+		tile.dst_rec.y = f32(y) * tile.dst_rec.height
 
 		blocks[hash] = tile
 	}

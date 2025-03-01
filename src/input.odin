@@ -2,7 +2,7 @@ package tyler
 
 import rl "vendor:raylib"
 
-MOUSE_SCROLL_SPEED :: 3
+MOUSE_SCROLL_SPEED :: 30
 MOUSE_PAN_SPEED :: 500
 
 MouseButton :: enum {
@@ -48,7 +48,7 @@ Input :: struct {
 
 process_input :: proc() {
 	// camera.zoom += rl.GetMouseWheelMove() * 0.1
-	input.mouse.wheel_delta = rl.GetMouseWheelMove() * MOUSE_SCROLL_SPEED
+	input.mouse.wheel_delta = rl.GetMouseWheelMove()
 	input.mouse.px_pos = rl.GetMousePosition()
 
 	input.mouse.btns = {}

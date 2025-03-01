@@ -238,31 +238,6 @@ load_tiles :: proc(
 	rl.BeginTextureMode(tileset.render_texture)
 	rl.ClearBackground(rl.BLANK)
 
-	// TODO:(lukefilewalker) do I want to do/can this in the same loop as above?
-	// 	 for y in 0 ..< panel_num_tiles_in_col {
-	// 		for x in 0 ..< panel_num_tiles_in_row {
-	// 			// for t, i in tiles_data {
-	// 			i := y * panel_num_tiles_in_row + x
-	// //			srcx := dsti % tex_num_tiles_in_row
-	// //			srcy := dsti / tex_num_tiles_in_row
-	// 			t_width := tiles_data[i].dst_rec.width
-	// 			t_height := tiles_data[i].dst_rec.height
-	// 			// x := f32(i32(i) % panel_num_tiles_in_row) * t_width
-	// 			// y := f32(i32(i) / panel_num_tiles_in_row) * t_height
-	// 			dst := rl.Rectangle{f32(x) * t_width, f32(y) * t_height, t_width, t_height}
-	// 			src := rl.Rectangle {
-	// 				f32(tex_num_tiles_in_col * 32) - 32 - tiles_data[i].src_rec.x,
-	// 				f32(tex_num_tiles_in_row * 32) - 32 - tiles_data[i].src_rec.y,
-	// 				tiles_data[i].src_rec.width,
-	// 				-tiles_data[i].src_rec.height,
-	// 			}
-	//
-	// 			rl.DrawTexturePro(imported_tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
-	// 			// fmt.printfln("%v %v", x, y)
-	// 		}
-	// //		y += 1
-	// 	}
-
 	for tile in tiles_data {
 		src := tile.src_rec
 		src.height *= -1
@@ -314,9 +289,8 @@ ui_update :: proc() -> bool {
 		scroll_offset += input.mouse.wheel_delta
 	}
 
-	// TODO:(lukefilewalker) fix this magic number - 64
-	x := i32((input.mouse.px_pos.x - xstart) / 64)
-	y := i32((input.mouse.px_pos.y - ystart) / 64)
+	x := i32((input.mouse.px_pos.x - xstart) / tiles_data[0].dst_rec.width)
+	y := i32((input.mouse.px_pos.y - ystart) / tiles_data[0].dst_rec.height)
 	t := tiles_data[y * panel_num_tiles_in_row + x]
 	hovering_tile = t.dst_rec
 
@@ -399,20 +373,28 @@ ui_draw_tileset :: proc() {
 	xstart := main_panel.content_start_left
 	ystart := calc_ypos(main_panel.content_start_top, len(main_panel.items))
 
-	src := rl.Rectangle{0, 0, f32(tileset.texture.width), f32(tileset.texture.height)}
+	// Keep scroll_offset positive
+	scroll_offset = scroll_offset < 0 ? 0 : scroll_offset
+
+	// Don't scroll tiles up past the top
+	tiles_top_offset := ystart + scroll_offset < ystart ? 0 : 64 * scroll_offset
+
+	// Don't scroll tiles down past the bottom
+	// TODO:(lukefilewalker) the todo description
+
+	if scroll_offset != 0 {
+		// fmt.printfln("%v %v %v", scroll_offset, ystart, ystart_offset)
+	}
+
+	src := rl.Rectangle {
+		0,
+		tiles_top_offset,
+		f32(tileset.texture.width),
+		f32(tileset.texture.height),
+	}
 	dst := rl.Rectangle{xstart, ystart, f32(tileset.texture.width), f32(tileset.texture.height)}
 
 	rl.DrawTexturePro(tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
-
-	// Draw tile outlines
-	dst_tile: rl.Rectangle
-	for t, i in tiles_data {
-		dst_tile = t.dst_rec
-		dst_tile.x += xstart
-		dst_tile.y += ystart //+ scroll_offset * 10
-
-		rl.DrawRectangleLinesEx(dst_tile, 1, rl.LIGHTGRAY)
-	}
 
 	// Draw selected tile next to mouse cursor
 	dst_selected := rl.Rectangle {
@@ -426,28 +408,7 @@ ui_draw_tileset :: proc() {
 	// Draw hovering tile
 	hovering_tile.x += xstart
 	hovering_tile.y += ystart
-	rl.DrawRectangleLinesEx(hovering_tile, 3, rl.RED)
-
-	// Debug text
-	// for t, i in tiles_data {
-	// 	font_size: i32 = 15
-	// 	dst_txt := fmt.ctprintf("%v\n%v", t.dst_rec, t.src_rec)
-	// 	dst_txt_w := rl.MeasureText(dst_txt, font_size)
-	//
-	// 	if rl.CheckCollisionPointRec(input.mouse.px_pos, t.dst_rec) {
-	// 		x := input.mouse.px_pos.x
-	// 		y := input.mouse.px_pos.y
-	// 		rl.DrawRectangle(i32(x + 10), i32(y), dst_txt_w + 50, 100, rl.GRAY)
-	// 		rl.DrawTextEx(
-	// 			ui_font,
-	// 			dst_txt,
-	// 			rl.Vector2{x + 5, y + 5},
-	// 			f32(font_size),
-	// 			0,
-	// 			rl.DARKGRAY,
-	// 		)
-	// 	}
-	// }
+	rl.DrawRectangleLinesEx(hovering_tile, 3, rl.LIGHTGRAY)
 }
 
 ui_draw_debug :: proc() {
