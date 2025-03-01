@@ -51,8 +51,8 @@ Map :: struct {
 Tileset :: struct {
 	texture:         ^rl.Texture2D,
 	render_texture:  rl.RenderTexture2D,
-	// TODO:(lukefilewalker) or something?
 	backing_texture: rl.Texture2D,
+	top_offset:      f32,
 }
 
 Selection :: struct {
@@ -63,6 +63,7 @@ Selection :: struct {
 scale: f32 = 1.0
 main_panel: Panel
 ui_font: rl.Font
+tileset_panel: rl.Rectangle
 
 imported_tileset: Tileset
 tileset: Tileset
@@ -178,7 +179,6 @@ save_tilemap :: proc(fname: cstring) -> bool {
 	return os.write_entire_file(string(fname), data)
 }
 
-// TODO:(lukefilewalker) shadowing imported_tileset :(
 load_tiles :: proc(
 	fname: cstring,
 	src_tile_width, src_tile_height: f32,
@@ -187,20 +187,18 @@ load_tiles :: proc(
 	imported_tileset.backing_texture = rl.LoadTexture(fname)
 	imported_tileset.texture = &imported_tileset.backing_texture
 
-	// TODO:(lukefilewalker) set texture to &backing_texture.texture
 	tex_num_tiles_in_row := imported_tileset.texture.width / i32(src_tile_width)
 	tex_num_tiles_in_col := imported_tileset.texture.height / i32(src_tile_height)
-
 	total_num_tiles := tex_num_tiles_in_row * tex_num_tiles_in_col
 
 	dst_tile_width := src_tile_width * scale
 	dst_tile_height := src_tile_height * scale
 
 	panel_num_tiles_in_col := total_num_tiles / panel_num_tiles_in_row
-
 	panel_int_height :=
 		f32(panel_num_tiles_in_col) * dst_tile_height + f32(len(main_panel.items)) + 140
 	panel_int_width := dst_tile_width * f32(panel_num_tiles_in_row)
+
 	recalc_panel_dims(&main_panel, panel_int_width, panel_int_height)
 
 	tiles_data = make([dynamic]Tile, total_num_tiles)
@@ -229,10 +227,10 @@ load_tiles :: proc(
 	}
 
 	// Redraw the new tile layout onto target texture
-	tilemap_width := f32(panel_num_tiles_in_row) * dst_tile_width
-	tilemap_height := f32(panel_num_tiles_in_col) * dst_tile_height
+	tileset_width := f32(panel_num_tiles_in_row) * dst_tile_width
+	tileset_height := f32(panel_num_tiles_in_col) * dst_tile_height
 
-	tileset.render_texture = rl.LoadRenderTexture(i32(tilemap_width), i32(tilemap_height))
+	tileset.render_texture = rl.LoadRenderTexture(i32(tileset_width), i32(tileset_height))
 	tileset.texture = &tileset.render_texture.texture
 
 	rl.BeginTextureMode(tileset.render_texture)
@@ -252,11 +250,8 @@ load_tiles :: proc(
 
 	rl.EndTextureMode()
 
-	// TODO:(lukefilewalker) free the free the original tilemap tex?
+	rl.UnloadTexture(imported_tileset.texture^)
 }
-
-// TODO:(lukefilewalker) debug
-tileset_panel: rl.Rectangle
 
 ui_update :: proc() -> bool {
 	// Exit if input is not for the UI panel
@@ -265,7 +260,6 @@ ui_update :: proc() -> bool {
 	}
 
 	// If a tileset hasn't been loaded return
-	// TODO:(lukefilewalker) is there a more readible way to check if tileset is loaded?
 	if tileset.texture == nil {
 		return false
 	}
@@ -287,12 +281,22 @@ ui_update :: proc() -> bool {
 	// Scroll tiles
 	if input.mouse.wheel_delta != 0 {
 		scroll_offset += input.mouse.wheel_delta
+		// Keep scroll_offset positive
+		scroll_offset = scroll_offset < 0 ? 0 : scroll_offset
 	}
+
+	// Don't scroll tiles up past the top
+	tileset.top_offset = ystart + scroll_offset < ystart ? 0 : 64 * scroll_offset
+
+	// Don't scroll tiles down past the bottom
+	// TODO:(lukefilewalker) is the comment says
 
 	x := i32((input.mouse.px_pos.x - xstart) / tiles_data[0].dst_rec.width)
 	y := i32((input.mouse.px_pos.y - ystart) / tiles_data[0].dst_rec.height)
 	t := tiles_data[y * panel_num_tiles_in_row + x]
 	hovering_tile = t.dst_rec
+	hovering_tile.x += xstart
+	hovering_tile.y += ystart
 
 	if .LEFT in input.mouse.btns {
 		selection = {
@@ -370,29 +374,18 @@ ui_draw_tileset :: proc() {
 		return
 	}
 
-	xstart := main_panel.content_start_left
-	ystart := calc_ypos(main_panel.content_start_top, len(main_panel.items))
-
-	// Keep scroll_offset positive
-	scroll_offset = scroll_offset < 0 ? 0 : scroll_offset
-
-	// Don't scroll tiles up past the top
-	tiles_top_offset := ystart + scroll_offset < ystart ? 0 : 64 * scroll_offset
-
-	// Don't scroll tiles down past the bottom
-	// TODO:(lukefilewalker) the todo description
-
-	if scroll_offset != 0 {
-		// fmt.printfln("%v %v %v", scroll_offset, ystart, ystart_offset)
-	}
-
 	src := rl.Rectangle {
 		0,
-		tiles_top_offset,
+		tileset.top_offset,
 		f32(tileset.texture.width),
 		f32(tileset.texture.height),
 	}
-	dst := rl.Rectangle{xstart, ystart, f32(tileset.texture.width), f32(tileset.texture.height)}
+	dst := rl.Rectangle {
+		tileset_panel.x,
+		tileset_panel.y,
+		f32(tileset.texture.width),
+		f32(tileset.texture.height),
+	}
 
 	rl.DrawTexturePro(tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
 
@@ -406,8 +399,6 @@ ui_draw_tileset :: proc() {
 	rl.DrawTexturePro(tileset.texture^, selection.tile.dst_rec, dst_selected, {0, 0}, 0, rl.WHITE)
 
 	// Draw hovering tile
-	hovering_tile.x += xstart
-	hovering_tile.y += ystart
 	rl.DrawRectangleLinesEx(hovering_tile, 3, rl.LIGHTGRAY)
 }
 
