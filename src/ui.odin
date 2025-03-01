@@ -156,7 +156,8 @@ ui_setup :: proc() {
 		},
 	})
 
-	recalculate_panel_dims(
+	recalc_panel_dims(
+		&main_panel,
 		main_panel.internal_width,
 		f32(len(main_panel.items)) * (BTN_HEIGHT + PANEL_PADDING),
 	)
@@ -201,21 +202,11 @@ load_tiles :: proc(
 	panel_int_height :=
 		f32(panel_num_tiles_in_col) * dst_tile_height + f32(len(main_panel.items)) + 140
 	panel_int_width := dst_tile_width * f32(panel_num_tiles_in_row)
-	recalculate_panel_dims(panel_int_width, panel_int_height)
+	recalc_panel_dims(&main_panel, panel_int_width, panel_int_height)
 
 	tiles_data = make([dynamic]Tile, total_num_tiles)
 
-	// panel_xstart := main_panel.content_start_left
-	// TODO:(lukefilewalker) magic number
-	// panel_ystart := y_pos(main_panel.content_start_top, len(main_panel.items) + 4)
-
-	// Reshape tile array into something that will fit in the UI
-	// i: i32
-	// for y in 0 ..< tex_num_tiles_in_col {
-	// 	for x in 0 ..< tex_num_tiles_in_row {
 	for i in 0 ..< total_num_tiles {
-		// TODO:(lukefilewalker) huh? Using i when I have x,y - but these x and y are for the original
-		// texture's coords?
 		src_x := i32(i) % tex_num_tiles_in_row
 		src_y := i32(i) / tex_num_tiles_in_row
 		dst_x := i32(i) % panel_num_tiles_in_row
@@ -230,9 +221,9 @@ load_tiles :: proc(
 				height = src_tile_height,
 			},
 			dst_rec = {
-				x      = f32(dst_x) * dst_tile_width, // + panel_xstart,
-				y      = f32(dst_y) * dst_tile_height, // + panel_ystart,
-				width  = dst_tile_width,
+				x = f32(dst_x) * dst_tile_width,
+				y = f32(dst_y) * dst_tile_height,
+				width = dst_tile_width,
 				height = dst_tile_height,
 			},
 		}
@@ -288,12 +279,14 @@ load_tiles :: proc(
 	rl.EndTextureMode()
 
 	// TODO:(lukefilewalker) free the free the original tilemap tex?
+}
 
+save_tileset :: proc() {
 	rl.ExportImage(rl.LoadImageFromTexture(tileset.texture^), "tileset.png")
 }
 
 // TODO:(lukefilewalker) debug
-tiles_panel: rl.Rectangle
+tileset_panel: rl.Rectangle
 
 ui_update :: proc() -> bool {
 	// Exit if input is not for the UI panel
@@ -301,52 +294,41 @@ ui_update :: proc() -> bool {
 		return false
 	}
 
+	// If a tileset hasn't been loaded return
+	// TODO:(lukefilewalker) is there a more readible way to check if tileset is loaded?
+	if tileset.texture == nil {
+		return false
+	}
+
 	xstart := main_panel.content_start_left
-	ystart := y_pos(main_panel.content_start_top, len(main_panel.items))
+	ystart := calc_ypos(main_panel.content_start_top, len(main_panel.items))
+	tileset_panel = rl.Rectangle {
+		xstart,
+		ystart,
+		f32(tileset.texture.width),
+		f32(tileset.texture.height),
+	}
+
+	// Exit if input is not for the tileset
+	if !rl.CheckCollisionPointRec(input.mouse.px_pos, tileset_panel) {
+		return false
+	}
 
 	// Scroll tiles
 	if input.mouse.wheel_delta != 0 {
-		tile_width := tiles_data[0].dst_rec.width
-		tile_height := tiles_data[0].dst_rec.height
-		num_tiles_in_row := imported_tileset.texture.width / i32(tile_width)
-		num_tiles_in_col := imported_tileset.texture.height / i32(tile_height)
-		num_tile_cols := num_tiles_in_row * num_tiles_in_col / panel_num_tiles_in_row
-
-		tiles_panel = rl.Rectangle {
-			x      = tiles_data[0].dst_rec.x,
-			y      = tiles_data[0].dst_rec.y,
-			width  = tiles_data[0].dst_rec.width * f32(panel_num_tiles_in_row),
-			height = f32(num_tile_cols) * tile_height * scale + 100,
-		}
-
-		if rl.CheckCollisionPointRec(input.mouse.px_pos, tiles_panel) {
-			scroll_offset += input.mouse.wheel_delta
-		}
+		scroll_offset += input.mouse.wheel_delta
 	}
 
-	if tileset.texture != nil {
-		panel_num_tiles_in_col := tileset.texture.height / 64
+	// TODO:(lukefilewalker) fix this magic number - 64
+	x := i32((input.mouse.px_pos.x - xstart) / 64)
+	y := i32((input.mouse.px_pos.y - ystart) / 64)
+	t := tiles_data[y * panel_num_tiles_in_row + x]
+	hovering_tile = t.dst_rec
 
-		tileset_panel := rl.Rectangle {
-			xstart,
-			ystart,
-			f32(tileset.texture.width),
-			f32(tileset.texture.height),
-		}
-		if rl.CheckCollisionPointRec(input.mouse.px_pos, tileset_panel) {
-			// x := i32((input.mouse.px_pos.x - xstart / f32(panel_num_tiles_in_row)) / 64)
-			x := i32((input.mouse.px_pos.x - xstart) / 64)
-			y := i32((input.mouse.px_pos.y - ystart) / 64)
-
-			t := tiles_data[y * panel_num_tiles_in_row + x]
-			hovering_tile = t.dst_rec
-
-			if .LEFT in input.mouse.btns {
-				selection = {
-					tile     = t,
-					selected = true,
-				}
-			}
+	if .LEFT in input.mouse.btns {
+		selection = {
+			tile     = t,
+			selected = true,
 		}
 	}
 
@@ -362,7 +344,7 @@ ui_draw :: proc() {
 			rl.GuiLabel(
 				{
 					main_panel.content_start_left,
-					y_pos(main_panel.content_start_top, i),
+					calc_ypos(main_panel.content_start_top, i),
 					main_panel.internal_width,
 					item.height,
 				},
@@ -373,7 +355,7 @@ ui_draw :: proc() {
 			if rl.GuiButton(
 				{
 					main_panel.content_start_left,
-					y_pos(main_panel.content_start_top, i),
+					calc_ypos(main_panel.content_start_top, i),
 					main_panel.internal_width,
 					item.height,
 				},
@@ -386,7 +368,7 @@ ui_draw :: proc() {
 			rl.GuiLabel(
 				{
 					main_panel.content_start_left,
-					y_pos(main_panel.content_start_top, i),
+					calc_ypos(main_panel.content_start_top, i),
 					main_panel.internal_width,
 					item.height,
 				},
@@ -396,7 +378,7 @@ ui_draw :: proc() {
 				{
 					// TODO:(lukefilewalker) magic num
 					main_panel.content_start_left + 120,
-					y_pos(main_panel.content_start_top, i),
+					calc_ypos(main_panel.content_start_top, i),
 					main_panel.internal_width - 150,
 					item.height,
 				},
@@ -409,18 +391,18 @@ ui_draw :: proc() {
 		}
 	}
 
-	draw_tileset()
+	ui_draw_tileset()
 
 	ui_draw_debug()
 }
 
-draw_tileset :: proc() {
+ui_draw_tileset :: proc() {
 	if tileset.texture == nil {
 		return
 	}
 
 	xstart := main_panel.content_start_left
-	ystart := y_pos(main_panel.content_start_top, len(main_panel.items))
+	ystart := calc_ypos(main_panel.content_start_top, len(main_panel.items))
 
 	src := rl.Rectangle{0, 0, f32(tileset.texture.width), f32(tileset.texture.height)}
 	dst := rl.Rectangle{xstart, ystart, f32(tileset.texture.width), f32(tileset.texture.height)}
@@ -478,20 +460,20 @@ ui_draw_debug :: proc() {
 	rl.DrawText(fmt.ctprintf("num_blocks: %d", len(blocks)), 400, 10, 20, rl.LIGHTGRAY)
 
 	rl.DrawRectangleLines(
-		i32(tiles_panel.x),
-		i32(tiles_panel.y),
-		i32(tiles_panel.width),
-		i32(tiles_panel.height),
+		i32(tileset_panel.x),
+		i32(tileset_panel.y),
+		i32(tileset_panel.width),
+		i32(tileset_panel.height),
 		rl.RED,
 	)
 }
 
-y_pos :: proc(y_from_top: f32, n: int) -> f32 {
+calc_ypos :: proc(y_from_top: f32, n: int) -> f32 {
 	return y_from_top + ((BTN_HEIGHT + PANEL_PADDING) * f32(n))
 }
 
-recalculate_panel_dims :: proc(internal_w, internal_h: f32) {
-	main_panel.rect.height = internal_h + PANEL_HEADER + main_panel.padding * 2
-	main_panel.internal_width = internal_w
-	main_panel.rect.width = main_panel.internal_width + main_panel.padding * 2
+recalc_panel_dims :: proc(panel: ^Panel, internal_w, internal_h: f32) {
+	panel.rect.height = internal_h + PANEL_HEADER + panel.padding * 2
+	panel.internal_width = internal_w
+	panel.rect.width = panel.internal_width + panel.padding * 2
 }
