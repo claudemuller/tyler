@@ -13,6 +13,7 @@ WORLD_HEIGHT :: 1080 * 2
 camera: rl.Camera2D
 input: Input
 blocks: map[u16]Tile
+// TODO:(lukefilewalker) handle non-square tiles
 block_size: i32
 
 main :: proc() {
@@ -48,7 +49,7 @@ setup :: proc() {
 	camera = {
 		target = {WORLD_WIDTH / 2, WORLD_HEIGHT / 2},
 		offset = {WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2},
-		zoom   = 1,
+		zoom   = scale,
 	}
 
 	ui_setup()
@@ -127,10 +128,10 @@ render :: proc() {
 		for y in i32(0) ..< WORLD_HEIGHT / block_size {
 			for x in i32(0) ..< WORLD_WIDTH / block_size {
 				rl.DrawRectangleLines(
-					x * block_size * i32(scale),
-					y * block_size * i32(scale),
-					block_size * i32(scale),
-					block_size * i32(scale),
+					x * block_size,
+					y * block_size,
+					block_size,
+					block_size,
 					{30, 30, 30, 255},
 				)
 			}

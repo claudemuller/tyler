@@ -104,36 +104,31 @@ ui_setup :: proc() {
 		Item{label = "Scale", type = .Slider, value = &scale, height = BTN_HEIGHT / 2},
 	)
 
-	append(
-		&main_panel.items,
-		Item {
-			label = "Load spritesheet",
-			type = .Button,
-			height = BTN_HEIGHT,
-			callback = proc() {
+	append(&main_panel.items, Item {
+		label = "Load spritesheet",
+		type = .Button,
+		height = BTN_HEIGHT,
+		callback = proc() {
+			tilesheet = tfd.openFileDialog(
+				"Open file",
+				nil,
+				2,
+				raw_data([]cstring{"*.png", "*.txt"}),
+				nil,
+				0,
+			)
+			if tilesheet != "" {
 				ret := tfd.inputBox("Tile width and height", "in pixels", "")
 				if ret == "" {
 					return
 				}
 				tile_width := f32(strconv.atof(string(ret)))
-				// TODO:(lukefilewalker) this isn't the best place :(
-				block_size = i32(tile_width)
 				tile_height := tile_width
 
-				tilesheet = tfd.openFileDialog(
-					"Open file",
-					nil,
-					2,
-					raw_data([]cstring{"*.png", "*.txt"}),
-					nil,
-					0,
-				)
-				if tilesheet != "" {
-					load_tiles(tilesheet, tile_width, tile_height, &imported_tileset)
-				}
-			},
+				load_tiles(tilesheet, tile_width, tile_height, &imported_tileset)
+			}
 		},
-	)
+	})
 
 	append(&main_panel.items, Item {
 		label = "Save tilemap",
@@ -165,6 +160,24 @@ ui_setup :: proc() {
 save_tilemap :: proc(path: cstring) -> bool {
 	if tileset.texture == nil {
 		return false
+	}
+
+	// Record the left-most tile x and the top-most tile y
+	xmin: f32
+	ymin: f32
+	for t in tiles_data {
+		if t.dst_rec.x < xmin {
+			xmin = t.dst_rec.x
+		}
+		if t.dst_rec.y < ymin {
+			ymin = t.dst_rec.y
+		}
+	}
+
+	// Trim the x and y values of tiles anchored to top left
+	for _, i in tiles_data {
+		tiles_data[i].dst_rec.x -= xmin
+		tiles_data[i].dst_rec.y -= ymin
 	}
 
 	map_data := Map {
@@ -207,6 +220,9 @@ load_tiles :: proc(
 
 	dst_tile_width := src_tile_width * scale
 	dst_tile_height := src_tile_height * scale
+
+	// TODO:(lukefilewalker) global var :/
+	block_size = i32(dst_tile_width)
 
 	panel_num_tiles_in_col := total_num_tiles / panel_num_tiles_in_row
 	panel_int_height :=
@@ -268,11 +284,6 @@ load_tiles :: proc(
 }
 
 ui_update :: proc() -> bool {
-	// Exit if input is not for the UI panel
-	if !rl.CheckCollisionPointRec(input.mouse.px_pos, main_panel.rect) {
-		return false
-	}
-
 	// If a tileset hasn't been loaded return
 	if tileset.texture == nil {
 		return false
@@ -285,6 +296,11 @@ ui_update :: proc() -> bool {
 		ystart,
 		f32(tileset.texture.width),
 		f32(tileset.texture.height),
+	}
+
+	// Exit if input is not for the UI panel
+	if !rl.CheckCollisionPointRec(input.mouse.px_pos, main_panel.rect) {
+		return false
 	}
 
 	// Exit if input is not for the tileset
@@ -372,8 +388,8 @@ ui_draw :: proc() {
 				"min",
 				"max",
 				&scale,
-				0,
-				10,
+				1,
+				3,
 			)
 		}
 	}
