@@ -3,7 +3,6 @@ package tyler
 import tfd "../vendor/tinyfiledialogs"
 import "core:encoding/json"
 import "core:fmt"
-import "core:math"
 import "core:os"
 import "core:strconv"
 import "core:strings"
@@ -35,6 +34,7 @@ Item :: struct {
 	type:     ItemType,
 	height:   f32,
 	value:    ^f32,
+	show:     bool,
 	callback: proc(),
 }
 
@@ -94,12 +94,6 @@ ui_setup :: proc() {
 		internal_width     = w - PANEL_PADDING * 2,
 	}
 
-	// Debug
-	scale = 2
-	// load_tiles("assets/tilesheets/colored_packed.png", 16, 16, &texture)
-	// load_tiles("../that-guy/res/assets/tilemap.png", 16, 16, &texture)
-	// _Debug
-
 	append(
 		&main_panel.items,
 		Item{label = "Scale", type = .Slider, value = &scale, height = BTN_HEIGHT / 2},
@@ -109,6 +103,7 @@ ui_setup :: proc() {
 		label = "Load spritesheet",
 		type = .Button,
 		height = BTN_HEIGHT,
+		show = true,
 		callback = proc() {
 			tilesheet = tfd.openFileDialog(
 				"Open file",
@@ -118,6 +113,7 @@ ui_setup :: proc() {
 				nil,
 				0,
 			)
+			rl.ClearBackground(rl.BLACK)
 			if tilesheet != "" {
 				ret := tfd.inputBox("Tile width and height", "in pixels", "")
 				if ret == "" {
@@ -163,23 +159,26 @@ save_tilemap :: proc(path: cstring) -> bool {
 		return false
 	}
 
-	// Record the left-most tile x and the top-most tile y
-	xmin: f32
-	ymin: f32
-	for t in tiles_data {
-		if t.dst_rec.x < xmin {
-			xmin = t.dst_rec.x
+	// Record the left-most tile x and the top-most tile y of the tilemap
+	xmin: f32 = WORLD_WIDTH
+	ymin: f32 = WORLD_HEIGHT
+	for _, b in blocks {
+		if b.dst_rec.x < xmin {
+			xmin = b.dst_rec.x
 		}
-		if t.dst_rec.y < ymin {
-			ymin = t.dst_rec.y
+		if b.dst_rec.y < ymin {
+			ymin = b.dst_rec.y
 		}
+		fmt.printfln("%v", b)
 	}
+	fmt.printfln("%f %f", xmin, ymin)
 
-	// Trim the x and y values of tiles anchored to top left
-	for _, i in tiles_data {
-		tiles_data[i].dst_rec.x -= xmin
-		tiles_data[i].dst_rec.y -= ymin
+	// Trim the x and y values of tiles anchored to top left of the tilemap
+	for _, &b in blocks {
+		b.dst_rec.x -= xmin
+		b.dst_rec.y -= ymin
 	}
+	fmt.printfln("%v", tiles_data)
 
 	map_data := Map {
 		scale     = scale,
@@ -219,8 +218,8 @@ load_tiles :: proc(
 	tex_num_tiles_in_col := imported_tileset.texture.height / i32(src_tile_height)
 	total_num_tiles := tex_num_tiles_in_row * tex_num_tiles_in_col
 
-	dst_tile_width := src_tile_width * scale
-	dst_tile_height := src_tile_height * scale
+	dst_tile_width := src_tile_width //* scale
+	dst_tile_height := src_tile_height //* scale
 
 	// TODO:(lukefilewalker) global var :/
 	block_size = i32(dst_tile_width)
@@ -270,11 +269,11 @@ load_tiles :: proc(
 	for tile in tiles_data {
 		src := tile.src_rec
 		src.height *= -1
-		src.x = f32(tex_num_tiles_in_row * 32) - 32 - tile.src_rec.x
-		src.y = f32(tex_num_tiles_in_col * 32) - 32 - tile.src_rec.y
+		src.x = f32(tex_num_tiles_in_row) * src.width - src.width - tile.src_rec.x
+		src.y = f32(tex_num_tiles_in_col) * src.height - src.height - tile.src_rec.y
 
 		dst := tile.dst_rec
-		dst.x = f32(panel_num_tiles_in_row * 64) - 64 - tile.dst_rec.x
+		dst.x = f32(panel_num_tiles_in_row) * dst.width - dst.width - tile.dst_rec.x
 
 		rl.DrawTexturePro(imported_tileset.texture^, src, dst, {0, 0}, 0, rl.WHITE)
 	}
@@ -285,14 +284,22 @@ load_tiles :: proc(
 }
 
 ui_update :: proc() -> bool {
-	// Clamp scale to a whole number
-	scale = math.round(scale)
-
-	// If a tileset hasn't been loaded return
-	if tileset.texture == nil {
+	// Exit if input is not for the UI panel
+	if !rl.CheckCollisionPointRec(input.mouse.px_pos, main_panel.rect) {
 		return false
 	}
 
+	res := true
+
+	// If a tileset hasn't been loaded return
+	if tileset.texture != nil {
+		ui_update_tilesheet()
+	}
+
+	return res
+}
+
+ui_update_tilesheet :: proc() -> bool {
 	xstart := main_panel.content_start_left
 	ystart := calc_ypos(main_panel.content_start_top, len(main_panel.items))
 	tileset_panel = rl.Rectangle {
@@ -300,11 +307,6 @@ ui_update :: proc() -> bool {
 		ystart,
 		f32(tileset.texture.width),
 		f32(tileset.texture.height),
-	}
-
-	// Exit if input is not for the UI panel
-	if !rl.CheckCollisionPointRec(input.mouse.px_pos, main_panel.rect) {
-		return false
 	}
 
 	// Exit if input is not for the tileset
@@ -323,7 +325,7 @@ ui_update :: proc() -> bool {
 	tileset.top_offset = ystart + scroll_offset < ystart ? 0 : 64 * scroll_offset
 
 	// Don't scroll tiles down past the bottom
-	// TODO:(lukefilewalker) is the comment says
+	// TODO:(lukefilewalker) as the comment says
 
 	x := i32((input.mouse.px_pos.x - xstart) / tiles_data[0].dst_rec.width)
 	y := i32((input.mouse.px_pos.y - ystart) / tiles_data[0].dst_rec.height)
@@ -389,8 +391,8 @@ ui_draw :: proc() {
 					main_panel.internal_width - 150,
 					item.height,
 				},
-				"min",
-				"max",
+				"1",
+				"3",
 				&scale,
 				1,
 				3,

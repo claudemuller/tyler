@@ -1,6 +1,7 @@
 package tyler
 
 import "core:fmt"
+import "core:math"
 import "core:mem"
 import "core:os"
 import rl "vendor:raylib"
@@ -12,6 +13,7 @@ WORLD_HEIGHT :: 1080 * 2
 
 camera: rl.Camera2D
 input: Input
+// TODO:(lukefilewalker) blocks is a crappy name
 blocks: map[u16]Tile
 // TODO:(lukefilewalker) handle non-square tiles
 block_size: i32
@@ -56,6 +58,9 @@ setup :: proc() {
 }
 
 update :: proc() {
+	// Clamp scale to a whole number
+	scale = math.round(scale)
+	camera.zoom = scale
 	// camera.offset += input.kb.axis
 
 	if ui_update() do return
