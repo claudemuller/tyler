@@ -3,6 +3,7 @@ package tyler
 import tfd "../vendor/tinyfiledialogs"
 import "core:encoding/json"
 import "core:fmt"
+import "core:math"
 import "core:os"
 import "core:strconv"
 import "core:strings"
@@ -284,6 +285,9 @@ load_tiles :: proc(
 }
 
 ui_update :: proc() -> bool {
+	// Clamp scale to a whole number
+	scale = math.round(scale)
+
 	// If a tileset hasn't been loaded return
 	if tileset.texture == nil {
 		return false
@@ -375,7 +379,7 @@ ui_draw :: proc() {
 					main_panel.internal_width,
 					item.height,
 				},
-				item.value == nil ? fmt.ctprint(item.label) : fmt.ctprintf("%s %f", item.label, item.value^),
+				item.value == nil ? fmt.ctprint(item.label) : fmt.ctprintf("%s: %d", item.label, i32(item.value^)),
 			)
 			rl.GuiSliderBar(
 				{
