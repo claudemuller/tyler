@@ -5,6 +5,7 @@ import "core:encoding/json"
 import "core:fmt"
 import "core:os"
 import "core:strconv"
+import "core:strings"
 import rl "vendor:raylib"
 
 PANEL_PADDING :: 8.0
@@ -161,12 +162,22 @@ ui_setup :: proc() {
 	)
 }
 
-save_tilemap :: proc(fname: cstring) -> bool {
+save_tilemap :: proc(path: cstring) -> bool {
+	if tileset.texture == nil {
+		return false
+	}
+
 	map_data := Map {
 		scale     = scale,
 		tilesheet = tilesheet,
 		tiles     = blocks,
 	}
+	path_parts := strings.split(string(path), "/")
+	fname := strings.split(path_parts[len(path_parts) - 1], ".")
+	path := strings.join(path_parts[:len(path_parts) - 1], "/")
+	tilemap_fname := fmt.tprintf("%s/%s.json", path, fname[0])
+	tilesheet_fname := fmt.ctprintf("%s/%s.png", path, fname[0])
+
 	data, err := json.marshal(map_data, allocator = context.temp_allocator)
 	if err != nil {
 		rl.TraceLog(.ERROR, fmt.ctprintf("Error marshalling tilemap to json: %v", err))
@@ -174,9 +185,12 @@ save_tilemap :: proc(fname: cstring) -> bool {
 	}
 	defer free_all(context.temp_allocator)
 
-	rl.ExportImage(rl.LoadImageFromTexture(tileset.texture^), fmt.ctprintf("%s.png", fname))
+	if ok := rl.ExportImage(rl.LoadImageFromTexture(tileset.texture^), tilesheet_fname); !ok {
+		rl.TraceLog(.ERROR, fmt.ctprintf("Error saving tilesheet to: %s", tilesheet_fname))
+		return false
+	}
 
-	return os.write_entire_file(string(fname), data)
+	return os.write_entire_file(tilemap_fname, data)
 }
 
 load_tiles :: proc(
